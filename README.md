@@ -30,12 +30,12 @@ to help me with that. This is a great project but not to far from reality, so he
 
 ## Roadmap
 
-[ ] Core application for Movie and Music cataloging
-[ ] Initial API implementation
-[ ] Initial WebUI implementation
-[ ] Media importing implementation
-[ ] Media scraping
-[ ] More stuff later...
+- [ ] Core application for Movie and Music cataloging
+- [ ] Initial API implementation
+- [ ] Initial WebUI implementation
+- [ ] Media importing implementation
+- [ ] Media scraping
+- [ ] More stuff later...
 
 ## How to help?
 
