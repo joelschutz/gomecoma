@@ -1,0 +1,96 @@
+version: '3'
+
+#includes:
+
+output: prefixed
+silent: true
+
+#vars:
+
+env:
+  ENV: local
+
+tasks:
+  default:
+    - task: build
+    - task: run
+
+  build:
+    desc: Build apps
+    cmds:
+      - echo "> Building apps..."
+      - GOARCH=wasm GOOS=js go build -o web/app.wasm src/*.go
+      - go build -o build/main src/*.go
+      - defer: echo "> Build done"
+
+  run:
+    deps: [build]
+    cmds:
+      - echo "> Run..."
+      - ./build/main
+      - defer: echo "> Run done"
+
+  clean:
+    cmds:
+      - echo "> Clean..."
+      - rm -r ./build
+      - rm -r ./web
+      - rm -r ./tmp
+      - rm coverage.out
+      - defer: echo "> Clean done"
+
+  test:
+    cmds:
+      - echo "> Testing..."
+      - go test -coverprofile=coverage.out ./internal/...
+      - defer: echo "> Testing done"
+
+  lint:
+    cmds:
+      - golangci-lint run
+
+  coverage-html:
+    deps: [test]
+    cmds:
+      - go tool cover -html=coverage.out
+
+  coverage:
+      deps: [test]
+      cmds:
+        - go tool cover -func=coverage.out
+
+  run-db:
+    cmds:
+      - echo "> Running databases..."
+      - echo "> Starting DynamoDB..."
+      - docker run --name dynamodb-local -p 8000:8000 -d amazon/dynamodb-local
+      - echo "> Starting Postgres..."
+      - docker run --name postgres-local -e POSTGRES_PASSWORD=mysecretpassword -d postgres
+      - defer: echo "> Running databases done"
+
+  stop-db:
+    cmds:
+      - echo "> Running databases..."
+      - echo "> Stoping DynamoDB..."
+      - docker stop dynamodb-local
+      - echo "> Removing DynamoDB..."
+      - docker rm dynamodb-local
+      - echo "> Stoping Postgres..."
+      - docker stop postgres-local
+      - echo "> Removing Postgres..."
+      - docker rm postgres-local
+      - defer: echo "> Running databases done"
+
+  version:
+    cmds:
+      - echo "> Version..."
+      - mkdir -p ./internal/version
+      - echo -e 'package version\nconst Version string = "{{.VERSION}}{{.DIRTY}}"\nconst Date string = "{{.DATE}}"' > ./internal/version/version.go
+      - defer: echo "> Version done"
+    vars:
+      VERSION:
+        sh: 'git log -n 1 --format=%h'
+      DIRTY:
+        sh: '[[ $(git status 2> /dev/null | tail -n1) == *"nothing to commit"* ]] || echo "*"'
+      DATE:
+        sh: 'date --utc "+%Y-%m-%d %H:%M:%S"'
