@@ -5,7 +5,6 @@ package ent
 import (
 	"context"
 	"database/sql/driver"
-	"errors"
 	"fmt"
 	"math"
 
@@ -132,7 +131,7 @@ func (mgq *MovieGenreQuery) FirstIDX(ctx context.Context) int {
 }
 
 // Only returns a single MovieGenre entity found by the query, ensuring it only returns one.
-// Returns a *NotSingularError when exactly one MovieGenre entity is not found.
+// Returns a *NotSingularError when more than one MovieGenre entity is found.
 // Returns a *NotFoundError when no MovieGenre entities are found.
 func (mgq *MovieGenreQuery) Only(ctx context.Context) (*MovieGenre, error) {
 	nodes, err := mgq.Limit(2).All(ctx)
@@ -159,7 +158,7 @@ func (mgq *MovieGenreQuery) OnlyX(ctx context.Context) *MovieGenre {
 }
 
 // OnlyID is like Only, but returns the only MovieGenre ID in the query.
-// Returns a *NotSingularError when exactly one MovieGenre ID is not found.
+// Returns a *NotSingularError when more than one MovieGenre ID is found.
 // Returns a *NotFoundError when no entities are found.
 func (mgq *MovieGenreQuery) OnlyID(ctx context.Context) (id int, err error) {
 	var ids []int
@@ -269,8 +268,9 @@ func (mgq *MovieGenreQuery) Clone() *MovieGenreQuery {
 		predicates: append([]predicate.MovieGenre{}, mgq.predicates...),
 		withMovies: mgq.withMovies.Clone(),
 		// clone intermediate query.
-		sql:  mgq.sql.Clone(),
-		path: mgq.path,
+		sql:    mgq.sql.Clone(),
+		path:   mgq.path,
+		unique: mgq.unique,
 	}
 }
 
@@ -301,15 +301,17 @@ func (mgq *MovieGenreQuery) WithMovies(opts ...func(*MovieQuery)) *MovieGenreQue
 //		Scan(ctx, &v)
 //
 func (mgq *MovieGenreQuery) GroupBy(field string, fields ...string) *MovieGenreGroupBy {
-	group := &MovieGenreGroupBy{config: mgq.config}
-	group.fields = append([]string{field}, fields...)
-	group.path = func(ctx context.Context) (prev *sql.Selector, err error) {
+	grbuild := &MovieGenreGroupBy{config: mgq.config}
+	grbuild.fields = append([]string{field}, fields...)
+	grbuild.path = func(ctx context.Context) (prev *sql.Selector, err error) {
 		if err := mgq.prepareQuery(ctx); err != nil {
 			return nil, err
 		}
 		return mgq.sqlQuery(ctx), nil
 	}
-	return group
+	grbuild.label = moviegenre.Label
+	grbuild.flds, grbuild.scan = &grbuild.fields, grbuild.Scan
+	return grbuild
 }
 
 // Select allows the selection one or more fields/columns for the given query,
@@ -327,7 +329,10 @@ func (mgq *MovieGenreQuery) GroupBy(field string, fields ...string) *MovieGenreG
 //
 func (mgq *MovieGenreQuery) Select(fields ...string) *MovieGenreSelect {
 	mgq.fields = append(mgq.fields, fields...)
-	return &MovieGenreSelect{MovieGenreQuery: mgq}
+	selbuild := &MovieGenreSelect{MovieGenreQuery: mgq}
+	selbuild.label = moviegenre.Label
+	selbuild.flds, selbuild.scan = &mgq.fields, selbuild.Scan
+	return selbuild
 }
 
 func (mgq *MovieGenreQuery) prepareQuery(ctx context.Context) error {
@@ -346,7 +351,7 @@ func (mgq *MovieGenreQuery) prepareQuery(ctx context.Context) error {
 	return nil
 }
 
-func (mgq *MovieGenreQuery) sqlAll(ctx context.Context) ([]*MovieGenre, error) {
+func (mgq *MovieGenreQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*MovieGenre, error) {
 	var (
 		nodes       = []*MovieGenre{}
 		_spec       = mgq.querySpec()
@@ -355,17 +360,16 @@ func (mgq *MovieGenreQuery) sqlAll(ctx context.Context) ([]*MovieGenre, error) {
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]interface{}, error) {
-		node := &MovieGenre{config: mgq.config}
-		nodes = append(nodes, node)
-		return node.scanValues(columns)
+		return (*MovieGenre).scanValues(nil, columns)
 	}
 	_spec.Assign = func(columns []string, values []interface{}) error {
-		if len(nodes) == 0 {
-			return fmt.Errorf("ent: Assign called without calling ScanValues")
-		}
-		node := nodes[len(nodes)-1]
+		node := &MovieGenre{config: mgq.config}
+		nodes = append(nodes, node)
 		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
+	}
+	for i := range hooks {
+		hooks[i](ctx, _spec)
 	}
 	if err := sqlgraph.QueryNodes(ctx, mgq.driver, _spec); err != nil {
 		return nil, err
@@ -375,66 +379,54 @@ func (mgq *MovieGenreQuery) sqlAll(ctx context.Context) ([]*MovieGenre, error) {
 	}
 
 	if query := mgq.withMovies; query != nil {
-		fks := make([]driver.Value, 0, len(nodes))
-		ids := make(map[int]*MovieGenre, len(nodes))
-		for _, node := range nodes {
-			ids[node.ID] = node
-			fks = append(fks, node.ID)
+		edgeids := make([]driver.Value, len(nodes))
+		byid := make(map[int]*MovieGenre)
+		nids := make(map[int]map[*MovieGenre]struct{})
+		for i, node := range nodes {
+			edgeids[i] = node.ID
+			byid[node.ID] = node
 			node.Edges.Movies = []*Movie{}
 		}
-		var (
-			edgeids []int
-			edges   = make(map[int][]*MovieGenre)
-		)
-		_spec := &sqlgraph.EdgeQuerySpec{
-			Edge: &sqlgraph.EdgeSpec{
-				Inverse: false,
-				Table:   moviegenre.MoviesTable,
-				Columns: moviegenre.MoviesPrimaryKey,
-			},
-			Predicate: func(s *sql.Selector) {
-				s.Where(sql.InValues(moviegenre.MoviesPrimaryKey[0], fks...))
-			},
-			ScanValues: func() [2]interface{} {
-				return [2]interface{}{new(sql.NullInt64), new(sql.NullInt64)}
-			},
-			Assign: func(out, in interface{}) error {
-				eout, ok := out.(*sql.NullInt64)
-				if !ok || eout == nil {
-					return fmt.Errorf("unexpected id value for edge-out")
+		query.Where(func(s *sql.Selector) {
+			joinT := sql.Table(moviegenre.MoviesTable)
+			s.Join(joinT).On(s.C(movie.FieldID), joinT.C(moviegenre.MoviesPrimaryKey[1]))
+			s.Where(sql.InValues(joinT.C(moviegenre.MoviesPrimaryKey[0]), edgeids...))
+			columns := s.SelectedColumns()
+			s.Select(joinT.C(moviegenre.MoviesPrimaryKey[0]))
+			s.AppendSelect(columns...)
+			s.SetDistinct(false)
+		})
+		neighbors, err := query.sqlAll(ctx, func(_ context.Context, spec *sqlgraph.QuerySpec) {
+			assign := spec.Assign
+			values := spec.ScanValues
+			spec.ScanValues = func(columns []string) ([]interface{}, error) {
+				values, err := values(columns[1:])
+				if err != nil {
+					return nil, err
 				}
-				ein, ok := in.(*sql.NullInt64)
-				if !ok || ein == nil {
-					return fmt.Errorf("unexpected id value for edge-in")
+				return append([]interface{}{new(sql.NullInt64)}, values...), nil
+			}
+			spec.Assign = func(columns []string, values []interface{}) error {
+				outValue := int(values[0].(*sql.NullInt64).Int64)
+				inValue := int(values[1].(*sql.NullInt64).Int64)
+				if nids[inValue] == nil {
+					nids[inValue] = map[*MovieGenre]struct{}{byid[outValue]: struct{}{}}
+					return assign(columns[1:], values[1:])
 				}
-				outValue := int(eout.Int64)
-				inValue := int(ein.Int64)
-				node, ok := ids[outValue]
-				if !ok {
-					return fmt.Errorf("unexpected node id in edges: %v", outValue)
-				}
-				if _, ok := edges[inValue]; !ok {
-					edgeids = append(edgeids, inValue)
-				}
-				edges[inValue] = append(edges[inValue], node)
+				nids[inValue][byid[outValue]] = struct{}{}
 				return nil
-			},
-		}
-		if err := sqlgraph.QueryEdges(ctx, mgq.driver, _spec); err != nil {
-			return nil, fmt.Errorf(`query edges "movies": %w`, err)
-		}
-		query.Where(movie.IDIn(edgeids...))
-		neighbors, err := query.All(ctx)
+			}
+		})
 		if err != nil {
 			return nil, err
 		}
 		for _, n := range neighbors {
-			nodes, ok := edges[n.ID]
+			nodes, ok := nids[n.ID]
 			if !ok {
 				return nil, fmt.Errorf(`unexpected "movies" node returned %v`, n.ID)
 			}
-			for i := range nodes {
-				nodes[i].Edges.Movies = append(nodes[i].Edges.Movies, n)
+			for kn := range nodes {
+				kn.Edges.Movies = append(kn.Edges.Movies, n)
 			}
 		}
 	}
@@ -542,6 +534,7 @@ func (mgq *MovieGenreQuery) sqlQuery(ctx context.Context) *sql.Selector {
 // MovieGenreGroupBy is the group-by builder for MovieGenre entities.
 type MovieGenreGroupBy struct {
 	config
+	selector
 	fields []string
 	fns    []AggregateFunc
 	// intermediate query (i.e. traversal path).
@@ -563,209 +556,6 @@ func (mggb *MovieGenreGroupBy) Scan(ctx context.Context, v interface{}) error {
 	}
 	mggb.sql = query
 	return mggb.sqlScan(ctx, v)
-}
-
-// ScanX is like Scan, but panics if an error occurs.
-func (mggb *MovieGenreGroupBy) ScanX(ctx context.Context, v interface{}) {
-	if err := mggb.Scan(ctx, v); err != nil {
-		panic(err)
-	}
-}
-
-// Strings returns list of strings from group-by.
-// It is only allowed when executing a group-by query with one field.
-func (mggb *MovieGenreGroupBy) Strings(ctx context.Context) ([]string, error) {
-	if len(mggb.fields) > 1 {
-		return nil, errors.New("ent: MovieGenreGroupBy.Strings is not achievable when grouping more than 1 field")
-	}
-	var v []string
-	if err := mggb.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// StringsX is like Strings, but panics if an error occurs.
-func (mggb *MovieGenreGroupBy) StringsX(ctx context.Context) []string {
-	v, err := mggb.Strings(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// String returns a single string from a group-by query.
-// It is only allowed when executing a group-by query with one field.
-func (mggb *MovieGenreGroupBy) String(ctx context.Context) (_ string, err error) {
-	var v []string
-	if v, err = mggb.Strings(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{moviegenre.Label}
-	default:
-		err = fmt.Errorf("ent: MovieGenreGroupBy.Strings returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// StringX is like String, but panics if an error occurs.
-func (mggb *MovieGenreGroupBy) StringX(ctx context.Context) string {
-	v, err := mggb.String(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Ints returns list of ints from group-by.
-// It is only allowed when executing a group-by query with one field.
-func (mggb *MovieGenreGroupBy) Ints(ctx context.Context) ([]int, error) {
-	if len(mggb.fields) > 1 {
-		return nil, errors.New("ent: MovieGenreGroupBy.Ints is not achievable when grouping more than 1 field")
-	}
-	var v []int
-	if err := mggb.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// IntsX is like Ints, but panics if an error occurs.
-func (mggb *MovieGenreGroupBy) IntsX(ctx context.Context) []int {
-	v, err := mggb.Ints(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Int returns a single int from a group-by query.
-// It is only allowed when executing a group-by query with one field.
-func (mggb *MovieGenreGroupBy) Int(ctx context.Context) (_ int, err error) {
-	var v []int
-	if v, err = mggb.Ints(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{moviegenre.Label}
-	default:
-		err = fmt.Errorf("ent: MovieGenreGroupBy.Ints returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// IntX is like Int, but panics if an error occurs.
-func (mggb *MovieGenreGroupBy) IntX(ctx context.Context) int {
-	v, err := mggb.Int(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Float64s returns list of float64s from group-by.
-// It is only allowed when executing a group-by query with one field.
-func (mggb *MovieGenreGroupBy) Float64s(ctx context.Context) ([]float64, error) {
-	if len(mggb.fields) > 1 {
-		return nil, errors.New("ent: MovieGenreGroupBy.Float64s is not achievable when grouping more than 1 field")
-	}
-	var v []float64
-	if err := mggb.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// Float64sX is like Float64s, but panics if an error occurs.
-func (mggb *MovieGenreGroupBy) Float64sX(ctx context.Context) []float64 {
-	v, err := mggb.Float64s(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Float64 returns a single float64 from a group-by query.
-// It is only allowed when executing a group-by query with one field.
-func (mggb *MovieGenreGroupBy) Float64(ctx context.Context) (_ float64, err error) {
-	var v []float64
-	if v, err = mggb.Float64s(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{moviegenre.Label}
-	default:
-		err = fmt.Errorf("ent: MovieGenreGroupBy.Float64s returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// Float64X is like Float64, but panics if an error occurs.
-func (mggb *MovieGenreGroupBy) Float64X(ctx context.Context) float64 {
-	v, err := mggb.Float64(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Bools returns list of bools from group-by.
-// It is only allowed when executing a group-by query with one field.
-func (mggb *MovieGenreGroupBy) Bools(ctx context.Context) ([]bool, error) {
-	if len(mggb.fields) > 1 {
-		return nil, errors.New("ent: MovieGenreGroupBy.Bools is not achievable when grouping more than 1 field")
-	}
-	var v []bool
-	if err := mggb.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// BoolsX is like Bools, but panics if an error occurs.
-func (mggb *MovieGenreGroupBy) BoolsX(ctx context.Context) []bool {
-	v, err := mggb.Bools(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Bool returns a single bool from a group-by query.
-// It is only allowed when executing a group-by query with one field.
-func (mggb *MovieGenreGroupBy) Bool(ctx context.Context) (_ bool, err error) {
-	var v []bool
-	if v, err = mggb.Bools(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{moviegenre.Label}
-	default:
-		err = fmt.Errorf("ent: MovieGenreGroupBy.Bools returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// BoolX is like Bool, but panics if an error occurs.
-func (mggb *MovieGenreGroupBy) BoolX(ctx context.Context) bool {
-	v, err := mggb.Bool(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
 }
 
 func (mggb *MovieGenreGroupBy) sqlScan(ctx context.Context, v interface{}) error {
@@ -809,6 +599,7 @@ func (mggb *MovieGenreGroupBy) sqlQuery() *sql.Selector {
 // MovieGenreSelect is the builder for selecting fields of MovieGenre entities.
 type MovieGenreSelect struct {
 	*MovieGenreQuery
+	selector
 	// intermediate query (i.e. traversal path).
 	sql *sql.Selector
 }
@@ -820,201 +611,6 @@ func (mgs *MovieGenreSelect) Scan(ctx context.Context, v interface{}) error {
 	}
 	mgs.sql = mgs.MovieGenreQuery.sqlQuery(ctx)
 	return mgs.sqlScan(ctx, v)
-}
-
-// ScanX is like Scan, but panics if an error occurs.
-func (mgs *MovieGenreSelect) ScanX(ctx context.Context, v interface{}) {
-	if err := mgs.Scan(ctx, v); err != nil {
-		panic(err)
-	}
-}
-
-// Strings returns list of strings from a selector. It is only allowed when selecting one field.
-func (mgs *MovieGenreSelect) Strings(ctx context.Context) ([]string, error) {
-	if len(mgs.fields) > 1 {
-		return nil, errors.New("ent: MovieGenreSelect.Strings is not achievable when selecting more than 1 field")
-	}
-	var v []string
-	if err := mgs.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// StringsX is like Strings, but panics if an error occurs.
-func (mgs *MovieGenreSelect) StringsX(ctx context.Context) []string {
-	v, err := mgs.Strings(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// String returns a single string from a selector. It is only allowed when selecting one field.
-func (mgs *MovieGenreSelect) String(ctx context.Context) (_ string, err error) {
-	var v []string
-	if v, err = mgs.Strings(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{moviegenre.Label}
-	default:
-		err = fmt.Errorf("ent: MovieGenreSelect.Strings returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// StringX is like String, but panics if an error occurs.
-func (mgs *MovieGenreSelect) StringX(ctx context.Context) string {
-	v, err := mgs.String(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Ints returns list of ints from a selector. It is only allowed when selecting one field.
-func (mgs *MovieGenreSelect) Ints(ctx context.Context) ([]int, error) {
-	if len(mgs.fields) > 1 {
-		return nil, errors.New("ent: MovieGenreSelect.Ints is not achievable when selecting more than 1 field")
-	}
-	var v []int
-	if err := mgs.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// IntsX is like Ints, but panics if an error occurs.
-func (mgs *MovieGenreSelect) IntsX(ctx context.Context) []int {
-	v, err := mgs.Ints(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Int returns a single int from a selector. It is only allowed when selecting one field.
-func (mgs *MovieGenreSelect) Int(ctx context.Context) (_ int, err error) {
-	var v []int
-	if v, err = mgs.Ints(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{moviegenre.Label}
-	default:
-		err = fmt.Errorf("ent: MovieGenreSelect.Ints returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// IntX is like Int, but panics if an error occurs.
-func (mgs *MovieGenreSelect) IntX(ctx context.Context) int {
-	v, err := mgs.Int(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Float64s returns list of float64s from a selector. It is only allowed when selecting one field.
-func (mgs *MovieGenreSelect) Float64s(ctx context.Context) ([]float64, error) {
-	if len(mgs.fields) > 1 {
-		return nil, errors.New("ent: MovieGenreSelect.Float64s is not achievable when selecting more than 1 field")
-	}
-	var v []float64
-	if err := mgs.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// Float64sX is like Float64s, but panics if an error occurs.
-func (mgs *MovieGenreSelect) Float64sX(ctx context.Context) []float64 {
-	v, err := mgs.Float64s(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Float64 returns a single float64 from a selector. It is only allowed when selecting one field.
-func (mgs *MovieGenreSelect) Float64(ctx context.Context) (_ float64, err error) {
-	var v []float64
-	if v, err = mgs.Float64s(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{moviegenre.Label}
-	default:
-		err = fmt.Errorf("ent: MovieGenreSelect.Float64s returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// Float64X is like Float64, but panics if an error occurs.
-func (mgs *MovieGenreSelect) Float64X(ctx context.Context) float64 {
-	v, err := mgs.Float64(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Bools returns list of bools from a selector. It is only allowed when selecting one field.
-func (mgs *MovieGenreSelect) Bools(ctx context.Context) ([]bool, error) {
-	if len(mgs.fields) > 1 {
-		return nil, errors.New("ent: MovieGenreSelect.Bools is not achievable when selecting more than 1 field")
-	}
-	var v []bool
-	if err := mgs.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// BoolsX is like Bools, but panics if an error occurs.
-func (mgs *MovieGenreSelect) BoolsX(ctx context.Context) []bool {
-	v, err := mgs.Bools(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Bool returns a single bool from a selector. It is only allowed when selecting one field.
-func (mgs *MovieGenreSelect) Bool(ctx context.Context) (_ bool, err error) {
-	var v []bool
-	if v, err = mgs.Bools(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{moviegenre.Label}
-	default:
-		err = fmt.Errorf("ent: MovieGenreSelect.Bools returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// BoolX is like Bool, but panics if an error occurs.
-func (mgs *MovieGenreSelect) BoolX(ctx context.Context) bool {
-	v, err := mgs.Bool(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
 }
 
 func (mgs *MovieGenreSelect) sqlScan(ctx context.Context, v interface{}) error {

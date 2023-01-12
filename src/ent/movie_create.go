@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/joelschutz/gomecoma/src/ent/artist"
 	"github.com/joelschutz/gomecoma/src/ent/country"
+	"github.com/joelschutz/gomecoma/src/ent/file"
 	"github.com/joelschutz/gomecoma/src/ent/movie"
 	"github.com/joelschutz/gomecoma/src/ent/moviegenre"
 	"github.com/joelschutz/gomecoma/src/ent/picture"
@@ -42,12 +43,6 @@ func (mc *MovieCreate) SetNillableOriginalTitle(s *string) *MovieCreate {
 	if s != nil {
 		mc.SetOriginalTitle(*s)
 	}
-	return mc
-}
-
-// SetLanguages sets the "languages" field.
-func (mc *MovieCreate) SetLanguages(s []string) *MovieCreate {
-	mc.mutation.SetLanguages(s)
 	return mc
 }
 
@@ -105,6 +100,25 @@ func (mc *MovieCreate) SetNillableWatched(b *bool) *MovieCreate {
 		mc.SetWatched(*b)
 	}
 	return mc
+}
+
+// SetFileID sets the "file" edge to the File entity by ID.
+func (mc *MovieCreate) SetFileID(id int) *MovieCreate {
+	mc.mutation.SetFileID(id)
+	return mc
+}
+
+// SetNillableFileID sets the "file" edge to the File entity by ID if the given value is not nil.
+func (mc *MovieCreate) SetNillableFileID(id *int) *MovieCreate {
+	if id != nil {
+		mc = mc.SetFileID(*id)
+	}
+	return mc
+}
+
+// SetFile sets the "file" edge to the File entity.
+func (mc *MovieCreate) SetFile(f *File) *MovieCreate {
+	return mc.SetFileID(f.ID)
 }
 
 // AddRatingIDs adds the "ratings" edge to the Rating entity by IDs.
@@ -359,14 +373,6 @@ func (mc *MovieCreate) createSpec() (*Movie, *sqlgraph.CreateSpec) {
 		})
 		_node.OriginalTitle = value
 	}
-	if value, ok := mc.mutation.Languages(); ok {
-		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
-			Type:   field.TypeJSON,
-			Value:  value,
-			Column: movie.FieldLanguages,
-		})
-		_node.Languages = value
-	}
 	if value, ok := mc.mutation.ReleaseDate(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
 			Type:   field.TypeTime,
@@ -398,6 +404,25 @@ func (mc *MovieCreate) createSpec() (*Movie, *sqlgraph.CreateSpec) {
 			Column: movie.FieldWatched,
 		})
 		_node.Watched = value
+	}
+	if nodes := mc.mutation.FileIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: false,
+			Table:   movie.FileTable,
+			Columns: []string{movie.FileColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: &sqlgraph.FieldSpec{
+					Type:   field.TypeInt,
+					Column: file.FieldID,
+				},
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := mc.mutation.RatingsIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

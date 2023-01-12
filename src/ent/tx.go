@@ -16,6 +16,8 @@ type Tx struct {
 	Artist *ArtistClient
 	// Country is the client for interacting with the Country builders.
 	Country *CountryClient
+	// File is the client for interacting with the File builders.
+	File *FileClient
 	// Movie is the client for interacting with the Movie builders.
 	Movie *MovieClient
 	// MovieGenre is the client for interacting with the MovieGenre builders.
@@ -161,6 +163,7 @@ func (tx *Tx) Client() *Client {
 func (tx *Tx) init() {
 	tx.Artist = NewArtistClient(tx.config)
 	tx.Country = NewCountryClient(tx.config)
+	tx.File = NewFileClient(tx.config)
 	tx.Movie = NewMovieClient(tx.config)
 	tx.MovieGenre = NewMovieGenreClient(tx.config)
 	tx.Picture = NewPictureClient(tx.config)

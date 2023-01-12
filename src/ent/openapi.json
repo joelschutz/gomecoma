@@ -1,0 +1,4730 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Ent Schema API",
+    "description": "This is an auto generated API description made out of an Ent schema definition",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/artists": {
+      "get": {
+        "tags": [
+          "Artist"
+        ],
+        "summary": "List Artists",
+        "description": "List Artists.",
+        "operationId": "listArtist",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "what page to render",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "description": "item count to render per page",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "result Artist list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ArtistList"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Artist"
+        ],
+        "summary": "Create a new Artist",
+        "description": "Creates a new Artist and persists it to storage.",
+        "operationId": "createArtist",
+        "requestBody": {
+          "description": "Artist to create",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "birthday": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "profile_picture": {
+                    "type": "integer"
+                  },
+                  "pictures": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "directed": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "acted": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "wrote": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "countries": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Artist created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtistCreate"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/artists/{id}": {
+      "get": {
+        "tags": [
+          "Artist"
+        ],
+        "summary": "Find a Artist by ID",
+        "description": "Finds the Artist with the requested ID and returns it.",
+        "operationId": "readArtist",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Artist",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Artist with requested ID was found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtistRead"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Artist"
+        ],
+        "summary": "Deletes a Artist by ID",
+        "description": "Deletes the Artist with the requested ID.",
+        "operationId": "deleteArtist",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Artist",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Artist with requested ID was deleted"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Artist"
+        ],
+        "summary": "Updates a Artist",
+        "description": "Updates a Artist and persists changes to storage.",
+        "operationId": "updateArtist",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Artist",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "description": "Artist properties to update",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "birthday": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "profile_picture": {
+                    "type": "integer"
+                  },
+                  "pictures": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "directed": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "acted": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "wrote": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "countries": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Artist updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtistUpdate"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/artists/{id}/acted": {
+      "get": {
+        "tags": [
+          "Artist"
+        ],
+        "summary": "List attached Acteds",
+        "description": "List attached Acteds.",
+        "operationId": "listArtistActed",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Artist",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "what page to render",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "description": "item count to render per page",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "result Artists list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Artist_ActedList"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/artists/{id}/countries": {
+      "get": {
+        "tags": [
+          "Artist"
+        ],
+        "summary": "List attached Countries",
+        "description": "List attached Countries.",
+        "operationId": "listArtistCountries",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Artist",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "what page to render",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "description": "item count to render per page",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "result Artists list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Artist_CountriesList"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/artists/{id}/directed": {
+      "get": {
+        "tags": [
+          "Artist"
+        ],
+        "summary": "List attached Directeds",
+        "description": "List attached Directeds.",
+        "operationId": "listArtistDirected",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Artist",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "what page to render",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "description": "item count to render per page",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "result Artists list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Artist_DirectedList"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/artists/{id}/pictures": {
+      "get": {
+        "tags": [
+          "Artist"
+        ],
+        "summary": "List attached Pictures",
+        "description": "List attached Pictures.",
+        "operationId": "listArtistPictures",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Artist",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "what page to render",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "description": "item count to render per page",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "result Artists list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Artist_PicturesList"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/artists/{id}/profile-picture": {
+      "get": {
+        "tags": [
+          "Artist"
+        ],
+        "summary": "Find the attached Picture",
+        "description": "Find the attached Picture of the Artist with the given ID",
+        "operationId": "readArtistProfilePicture",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Artist",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Picture attached to Artist with requested ID was found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Artist_ProfilePictureRead"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/artists/{id}/wrote": {
+      "get": {
+        "tags": [
+          "Artist"
+        ],
+        "summary": "List attached Wrotes",
+        "description": "List attached Wrotes.",
+        "operationId": "listArtistWrote",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Artist",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "what page to render",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "description": "item count to render per page",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "result Artists list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Artist_WroteList"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/countries": {
+      "get": {
+        "tags": [
+          "Country"
+        ],
+        "summary": "List Countries",
+        "description": "List Countries.",
+        "operationId": "listCountry",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "what page to render",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "description": "item count to render per page",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "result Country list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CountryList"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Country"
+        ],
+        "summary": "Create a new Country",
+        "description": "Creates a new Country and persists it to storage.",
+        "operationId": "createCountry",
+        "requestBody": {
+          "description": "Country to create",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string"
+                  },
+                  "movies": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "artists": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "required": [
+                  "name",
+                  "code"
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Country created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CountryCreate"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/countries/{id}": {
+      "get": {
+        "tags": [
+          "Country"
+        ],
+        "summary": "Find a Country by ID",
+        "description": "Finds the Country with the requested ID and returns it.",
+        "operationId": "readCountry",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Country",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Country with requested ID was found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CountryRead"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Country"
+        ],
+        "summary": "Deletes a Country by ID",
+        "description": "Deletes the Country with the requested ID.",
+        "operationId": "deleteCountry",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Country",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Country with requested ID was deleted"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Country"
+        ],
+        "summary": "Updates a Country",
+        "description": "Updates a Country and persists changes to storage.",
+        "operationId": "updateCountry",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Country",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "description": "Country properties to update",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string"
+                  },
+                  "movies": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "artists": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Country updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CountryUpdate"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/countries/{id}/artists": {
+      "get": {
+        "tags": [
+          "Country"
+        ],
+        "summary": "List attached Artists",
+        "description": "List attached Artists.",
+        "operationId": "listCountryArtists",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Country",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "what page to render",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "description": "item count to render per page",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "result Countries list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Country_ArtistsList"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/countries/{id}/movies": {
+      "get": {
+        "tags": [
+          "Country"
+        ],
+        "summary": "List attached Movies",
+        "description": "List attached Movies.",
+        "operationId": "listCountryMovies",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Country",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "what page to render",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "description": "item count to render per page",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "result Countries list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Country_MoviesList"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/files": {
+      "get": {
+        "tags": [
+          "File"
+        ],
+        "summary": "List Files",
+        "description": "List Files.",
+        "operationId": "listFile",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "what page to render",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "description": "item count to render per page",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "result File list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FileList"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "File"
+        ],
+        "summary": "Create a new File",
+        "description": "Creates a new File and persists it to storage.",
+        "operationId": "createFile",
+        "requestBody": {
+          "description": "File to create",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "audio",
+                      "video",
+                      "image"
+                    ]
+                  },
+                  "external_id": {
+                    "type": "string"
+                  },
+                  "external_info_provider": {
+                    "type": "string"
+                  },
+                  "results": {
+                    "type": "string"
+                  },
+                  "synced": {
+                    "type": "boolean"
+                  },
+                  "movie": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "name",
+                  "path",
+                  "type",
+                  "synced"
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "File created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileCreate"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/files/{id}": {
+      "get": {
+        "tags": [
+          "File"
+        ],
+        "summary": "Find a File by ID",
+        "description": "Finds the File with the requested ID and returns it.",
+        "operationId": "readFile",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the File",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File with requested ID was found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileRead"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "File"
+        ],
+        "summary": "Deletes a File by ID",
+        "description": "Deletes the File with the requested ID.",
+        "operationId": "deleteFile",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the File",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "File with requested ID was deleted"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "File"
+        ],
+        "summary": "Updates a File",
+        "description": "Updates a File and persists changes to storage.",
+        "operationId": "updateFile",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the File",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "description": "File properties to update",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "audio",
+                      "video",
+                      "image"
+                    ]
+                  },
+                  "external_id": {
+                    "type": "string"
+                  },
+                  "external_info_provider": {
+                    "type": "string"
+                  },
+                  "results": {
+                    "type": "string"
+                  },
+                  "synced": {
+                    "type": "boolean"
+                  },
+                  "movie": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "File updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileUpdate"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/files/{id}/movie": {
+      "get": {
+        "tags": [
+          "File"
+        ],
+        "summary": "Find the attached Movie",
+        "description": "Find the attached Movie of the File with the given ID",
+        "operationId": "readFileMovie",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the File",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Movie attached to File with requested ID was found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/File_MovieRead"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/movie-genres": {
+      "get": {
+        "tags": [
+          "MovieGenre"
+        ],
+        "summary": "List MovieGenres",
+        "description": "List MovieGenres.",
+        "operationId": "listMovieGenre",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "what page to render",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "description": "item count to render per page",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "result MovieGenre list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MovieGenreList"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "MovieGenre"
+        ],
+        "summary": "Create a new MovieGenre",
+        "description": "Creates a new MovieGenre and persists it to storage.",
+        "operationId": "createMovieGenre",
+        "requestBody": {
+          "description": "MovieGenre to create",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "movies": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "MovieGenre created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MovieGenreCreate"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/movie-genres/{id}": {
+      "get": {
+        "tags": [
+          "MovieGenre"
+        ],
+        "summary": "Find a MovieGenre by ID",
+        "description": "Finds the MovieGenre with the requested ID and returns it.",
+        "operationId": "readMovieGenre",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the MovieGenre",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "MovieGenre with requested ID was found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MovieGenreRead"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "MovieGenre"
+        ],
+        "summary": "Deletes a MovieGenre by ID",
+        "description": "Deletes the MovieGenre with the requested ID.",
+        "operationId": "deleteMovieGenre",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the MovieGenre",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "MovieGenre with requested ID was deleted"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "MovieGenre"
+        ],
+        "summary": "Updates a MovieGenre",
+        "description": "Updates a MovieGenre and persists changes to storage.",
+        "operationId": "updateMovieGenre",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the MovieGenre",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "description": "MovieGenre properties to update",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "movies": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "MovieGenre updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MovieGenreUpdate"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/movie-genres/{id}/movies": {
+      "get": {
+        "tags": [
+          "MovieGenre"
+        ],
+        "summary": "List attached Movies",
+        "description": "List attached Movies.",
+        "operationId": "listMovieGenreMovies",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the MovieGenre",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "what page to render",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "description": "item count to render per page",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "result MovieGenres list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MovieGenre_MoviesList"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/movies": {
+      "get": {
+        "tags": [
+          "Movie"
+        ],
+        "summary": "List Movies",
+        "description": "List Movies.",
+        "operationId": "listMovie",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "what page to render",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "description": "item count to render per page",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "result Movie list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MovieList"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Movie"
+        ],
+        "summary": "Create a new Movie",
+        "description": "Creates a new Movie and persists it to storage.",
+        "operationId": "createMovie",
+        "requestBody": {
+          "description": "Movie to create",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "original_title": {
+                    "type": "string"
+                  },
+                  "release_date": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "plot": {
+                    "type": "string"
+                  },
+                  "duration": {
+                    "type": "integer"
+                  },
+                  "watched": {
+                    "type": "boolean"
+                  },
+                  "file": {
+                    "type": "integer"
+                  },
+                  "ratings": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "poster": {
+                    "type": "integer"
+                  },
+                  "fanart": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "cast": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "directors": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "writers": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "genres": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "countries": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "required": [
+                  "title",
+                  "watched"
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Movie created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MovieCreate"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/movies/{id}": {
+      "get": {
+        "tags": [
+          "Movie"
+        ],
+        "summary": "Find a Movie by ID",
+        "description": "Finds the Movie with the requested ID and returns it.",
+        "operationId": "readMovie",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Movie",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Movie with requested ID was found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MovieRead"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Movie"
+        ],
+        "summary": "Deletes a Movie by ID",
+        "description": "Deletes the Movie with the requested ID.",
+        "operationId": "deleteMovie",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Movie",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Movie with requested ID was deleted"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Movie"
+        ],
+        "summary": "Updates a Movie",
+        "description": "Updates a Movie and persists changes to storage.",
+        "operationId": "updateMovie",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Movie",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "description": "Movie properties to update",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "original_title": {
+                    "type": "string"
+                  },
+                  "release_date": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "plot": {
+                    "type": "string"
+                  },
+                  "duration": {
+                    "type": "integer"
+                  },
+                  "watched": {
+                    "type": "boolean"
+                  },
+                  "file": {
+                    "type": "integer"
+                  },
+                  "ratings": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "poster": {
+                    "type": "integer"
+                  },
+                  "fanart": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "cast": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "directors": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "writers": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "genres": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "countries": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Movie updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MovieUpdate"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/movies/{id}/cast": {
+      "get": {
+        "tags": [
+          "Movie"
+        ],
+        "summary": "List attached Casts",
+        "description": "List attached Casts.",
+        "operationId": "listMovieCast",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Movie",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "what page to render",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "description": "item count to render per page",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "result Movies list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Movie_CastList"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/movies/{id}/countries": {
+      "get": {
+        "tags": [
+          "Movie"
+        ],
+        "summary": "List attached Countries",
+        "description": "List attached Countries.",
+        "operationId": "listMovieCountries",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Movie",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "what page to render",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "description": "item count to render per page",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "result Movies list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Movie_CountriesList"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/movies/{id}/directors": {
+      "get": {
+        "tags": [
+          "Movie"
+        ],
+        "summary": "List attached Directors",
+        "description": "List attached Directors.",
+        "operationId": "listMovieDirectors",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Movie",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "what page to render",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "description": "item count to render per page",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "result Movies list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Movie_DirectorsList"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/movies/{id}/fanart": {
+      "get": {
+        "tags": [
+          "Movie"
+        ],
+        "summary": "List attached Fanarts",
+        "description": "List attached Fanarts.",
+        "operationId": "listMovieFanart",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Movie",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "what page to render",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "description": "item count to render per page",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "result Movies list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Movie_FanartList"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/movies/{id}/file": {
+      "get": {
+        "tags": [
+          "Movie"
+        ],
+        "summary": "Find the attached File",
+        "description": "Find the attached File of the Movie with the given ID",
+        "operationId": "readMovieFile",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Movie",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File attached to Movie with requested ID was found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Movie_FileRead"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/movies/{id}/genres": {
+      "get": {
+        "tags": [
+          "Movie"
+        ],
+        "summary": "List attached Genres",
+        "description": "List attached Genres.",
+        "operationId": "listMovieGenres",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Movie",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "what page to render",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "description": "item count to render per page",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "result Movies list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Movie_GenresList"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/movies/{id}/poster": {
+      "get": {
+        "tags": [
+          "Movie"
+        ],
+        "summary": "Find the attached Picture",
+        "description": "Find the attached Picture of the Movie with the given ID",
+        "operationId": "readMoviePoster",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Movie",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Picture attached to Movie with requested ID was found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Movie_PosterRead"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/movies/{id}/ratings": {
+      "get": {
+        "tags": [
+          "Movie"
+        ],
+        "summary": "List attached Ratings",
+        "description": "List attached Ratings.",
+        "operationId": "listMovieRatings",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Movie",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "what page to render",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "description": "item count to render per page",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "result Movies list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Movie_RatingsList"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/movies/{id}/writers": {
+      "get": {
+        "tags": [
+          "Movie"
+        ],
+        "summary": "List attached Writers",
+        "description": "List attached Writers.",
+        "operationId": "listMovieWriters",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Movie",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "what page to render",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "description": "item count to render per page",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "result Movies list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Movie_WritersList"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/pictures": {
+      "get": {
+        "tags": [
+          "Picture"
+        ],
+        "summary": "List Pictures",
+        "description": "List Pictures.",
+        "operationId": "listPicture",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "what page to render",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "description": "item count to render per page",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "result Picture list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PictureList"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Picture"
+        ],
+        "summary": "Create a new Picture",
+        "description": "Creates a new Picture and persists it to storage.",
+        "operationId": "createPicture",
+        "requestBody": {
+          "description": "Picture to create",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "filename": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "filename",
+                  "path"
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Picture created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PictureCreate"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/pictures/{id}": {
+      "get": {
+        "tags": [
+          "Picture"
+        ],
+        "summary": "Find a Picture by ID",
+        "description": "Finds the Picture with the requested ID and returns it.",
+        "operationId": "readPicture",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Picture",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Picture with requested ID was found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PictureRead"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Picture"
+        ],
+        "summary": "Deletes a Picture by ID",
+        "description": "Deletes the Picture with the requested ID.",
+        "operationId": "deletePicture",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Picture",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Picture with requested ID was deleted"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Picture"
+        ],
+        "summary": "Updates a Picture",
+        "description": "Updates a Picture and persists changes to storage.",
+        "operationId": "updatePicture",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Picture",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "description": "Picture properties to update",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "filename": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Picture updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PictureUpdate"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/ratings": {
+      "get": {
+        "tags": [
+          "Rating"
+        ],
+        "summary": "List Ratings",
+        "description": "List Ratings.",
+        "operationId": "listRating",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "what page to render",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "itemsPerPage",
+            "in": "query",
+            "description": "item count to render per page",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "result Rating list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RatingList"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Rating"
+        ],
+        "summary": "Create a new Rating",
+        "description": "Creates a new Rating and persists it to storage.",
+        "operationId": "createRating",
+        "requestBody": {
+          "description": "Rating to create",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "origin": {
+                    "type": "string"
+                  },
+                  "original_rating": {
+                    "type": "string"
+                  },
+                  "normalized_rating": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "origin",
+                  "original_rating",
+                  "normalized_rating"
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Rating created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RatingCreate"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/ratings/{id}": {
+      "get": {
+        "tags": [
+          "Rating"
+        ],
+        "summary": "Find a Rating by ID",
+        "description": "Finds the Rating with the requested ID and returns it.",
+        "operationId": "readRating",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Rating",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rating with requested ID was found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RatingRead"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Rating"
+        ],
+        "summary": "Deletes a Rating by ID",
+        "description": "Deletes the Rating with the requested ID.",
+        "operationId": "deleteRating",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Rating",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Rating with requested ID was deleted"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Rating"
+        ],
+        "summary": "Updates a Rating",
+        "description": "Updates a Rating and persists changes to storage.",
+        "operationId": "updateRating",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the Rating",
+            "schema": {
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "description": "Rating properties to update",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "origin": {
+                    "type": "string"
+                  },
+                  "original_rating": {
+                    "type": "string"
+                  },
+                  "normalized_rating": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Rating updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RatingUpdate"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Artist": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "birthday": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "profile_picture": {
+            "$ref": "#/components/schemas/Picture"
+          },
+          "pictures": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Picture"
+            }
+          },
+          "directed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Movie"
+            }
+          },
+          "acted": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Movie"
+            }
+          },
+          "wrote": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Movie"
+            }
+          },
+          "countries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Country"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "ArtistCreate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "birthday": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "ArtistList": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "birthday": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "ArtistRead": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "birthday": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "ArtistUpdate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "birthday": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "Artist_ActedList": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "original_title": {
+            "type": "string"
+          },
+          "release_date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "plot": {
+            "type": "string"
+          },
+          "duration": {
+            "type": "integer"
+          },
+          "watched": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "watched"
+        ]
+      },
+      "Artist_CountriesList": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "code"
+        ]
+      },
+      "Artist_DirectedList": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "original_title": {
+            "type": "string"
+          },
+          "release_date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "plot": {
+            "type": "string"
+          },
+          "duration": {
+            "type": "integer"
+          },
+          "watched": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "watched"
+        ]
+      },
+      "Artist_PicturesList": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "filename",
+          "path"
+        ]
+      },
+      "Artist_ProfilePictureRead": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "filename",
+          "path"
+        ]
+      },
+      "Artist_WroteList": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "original_title": {
+            "type": "string"
+          },
+          "release_date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "plot": {
+            "type": "string"
+          },
+          "duration": {
+            "type": "integer"
+          },
+          "watched": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "watched"
+        ]
+      },
+      "Country": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "movies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Movie"
+            }
+          },
+          "artists": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Artist"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "code"
+        ]
+      },
+      "CountryCreate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "code"
+        ]
+      },
+      "CountryList": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "code"
+        ]
+      },
+      "CountryRead": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "code"
+        ]
+      },
+      "CountryUpdate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "code"
+        ]
+      },
+      "Country_ArtistsList": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "birthday": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "Country_MoviesList": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "original_title": {
+            "type": "string"
+          },
+          "release_date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "plot": {
+            "type": "string"
+          },
+          "duration": {
+            "type": "integer"
+          },
+          "watched": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "watched"
+        ]
+      },
+      "File": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "audio",
+              "video",
+              "image"
+            ]
+          },
+          "external_id": {
+            "type": "string"
+          },
+          "external_info_provider": {
+            "type": "string"
+          },
+          "results": {
+            "type": "string"
+          },
+          "synced": {
+            "type": "boolean"
+          },
+          "movie": {
+            "$ref": "#/components/schemas/Movie"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "path",
+          "type",
+          "synced"
+        ]
+      },
+      "FileCreate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "audio",
+              "video",
+              "image"
+            ]
+          },
+          "external_id": {
+            "type": "string"
+          },
+          "external_info_provider": {
+            "type": "string"
+          },
+          "results": {
+            "type": "string"
+          },
+          "synced": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "path",
+          "type",
+          "synced"
+        ]
+      },
+      "FileList": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "audio",
+              "video",
+              "image"
+            ]
+          },
+          "external_id": {
+            "type": "string"
+          },
+          "external_info_provider": {
+            "type": "string"
+          },
+          "results": {
+            "type": "string"
+          },
+          "synced": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "path",
+          "type",
+          "synced"
+        ]
+      },
+      "FileRead": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "audio",
+              "video",
+              "image"
+            ]
+          },
+          "external_id": {
+            "type": "string"
+          },
+          "external_info_provider": {
+            "type": "string"
+          },
+          "results": {
+            "type": "string"
+          },
+          "synced": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "path",
+          "type",
+          "synced"
+        ]
+      },
+      "FileUpdate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "audio",
+              "video",
+              "image"
+            ]
+          },
+          "external_id": {
+            "type": "string"
+          },
+          "external_info_provider": {
+            "type": "string"
+          },
+          "results": {
+            "type": "string"
+          },
+          "synced": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "path",
+          "type",
+          "synced"
+        ]
+      },
+      "File_MovieRead": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "original_title": {
+            "type": "string"
+          },
+          "release_date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "plot": {
+            "type": "string"
+          },
+          "duration": {
+            "type": "integer"
+          },
+          "watched": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "watched"
+        ]
+      },
+      "Movie": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "original_title": {
+            "type": "string"
+          },
+          "release_date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "plot": {
+            "type": "string"
+          },
+          "duration": {
+            "type": "integer"
+          },
+          "watched": {
+            "type": "boolean"
+          },
+          "file": {
+            "$ref": "#/components/schemas/File"
+          },
+          "ratings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Rating"
+            }
+          },
+          "poster": {
+            "$ref": "#/components/schemas/Picture"
+          },
+          "fanart": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Picture"
+            }
+          },
+          "cast": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Artist"
+            }
+          },
+          "directors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Artist"
+            }
+          },
+          "writers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Artist"
+            }
+          },
+          "genres": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MovieGenre"
+            }
+          },
+          "countries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Country"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "watched"
+        ]
+      },
+      "MovieCreate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "original_title": {
+            "type": "string"
+          },
+          "release_date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "plot": {
+            "type": "string"
+          },
+          "duration": {
+            "type": "integer"
+          },
+          "watched": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "watched"
+        ]
+      },
+      "MovieGenre": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "movies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Movie"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "MovieGenreCreate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "MovieGenreList": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "MovieGenreRead": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "MovieGenreUpdate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "MovieGenre_MoviesList": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "original_title": {
+            "type": "string"
+          },
+          "release_date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "plot": {
+            "type": "string"
+          },
+          "duration": {
+            "type": "integer"
+          },
+          "watched": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "watched"
+        ]
+      },
+      "MovieList": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "original_title": {
+            "type": "string"
+          },
+          "release_date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "plot": {
+            "type": "string"
+          },
+          "duration": {
+            "type": "integer"
+          },
+          "watched": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "watched"
+        ]
+      },
+      "MovieRead": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "original_title": {
+            "type": "string"
+          },
+          "release_date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "plot": {
+            "type": "string"
+          },
+          "duration": {
+            "type": "integer"
+          },
+          "watched": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "watched"
+        ]
+      },
+      "MovieUpdate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "original_title": {
+            "type": "string"
+          },
+          "release_date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "plot": {
+            "type": "string"
+          },
+          "duration": {
+            "type": "integer"
+          },
+          "watched": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "watched"
+        ]
+      },
+      "Movie_CastList": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "birthday": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "Movie_CountriesList": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "code"
+        ]
+      },
+      "Movie_DirectorsList": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "birthday": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "Movie_FanartList": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "filename",
+          "path"
+        ]
+      },
+      "Movie_FileRead": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "audio",
+              "video",
+              "image"
+            ]
+          },
+          "external_id": {
+            "type": "string"
+          },
+          "external_info_provider": {
+            "type": "string"
+          },
+          "results": {
+            "type": "string"
+          },
+          "synced": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "path",
+          "type",
+          "synced"
+        ]
+      },
+      "Movie_GenresList": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "Movie_PosterRead": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "filename",
+          "path"
+        ]
+      },
+      "Movie_RatingsList": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "origin": {
+            "type": "string"
+          },
+          "original_rating": {
+            "type": "string"
+          },
+          "normalized_rating": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "origin",
+          "original_rating",
+          "normalized_rating"
+        ]
+      },
+      "Movie_WritersList": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "birthday": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "Picture": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "filename",
+          "path"
+        ]
+      },
+      "PictureCreate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "filename",
+          "path"
+        ]
+      },
+      "PictureList": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "filename",
+          "path"
+        ]
+      },
+      "PictureRead": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "filename",
+          "path"
+        ]
+      },
+      "PictureUpdate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "filename",
+          "path"
+        ]
+      },
+      "Rating": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "origin": {
+            "type": "string"
+          },
+          "original_rating": {
+            "type": "string"
+          },
+          "normalized_rating": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "origin",
+          "original_rating",
+          "normalized_rating"
+        ]
+      },
+      "RatingCreate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "origin": {
+            "type": "string"
+          },
+          "original_rating": {
+            "type": "string"
+          },
+          "normalized_rating": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "origin",
+          "original_rating",
+          "normalized_rating"
+        ]
+      },
+      "RatingList": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "origin": {
+            "type": "string"
+          },
+          "original_rating": {
+            "type": "string"
+          },
+          "normalized_rating": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "origin",
+          "original_rating",
+          "normalized_rating"
+        ]
+      },
+      "RatingRead": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "origin": {
+            "type": "string"
+          },
+          "original_rating": {
+            "type": "string"
+          },
+          "normalized_rating": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "origin",
+          "original_rating",
+          "normalized_rating"
+        ]
+      },
+      "RatingUpdate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "origin": {
+            "type": "string"
+          },
+          "original_rating": {
+            "type": "string"
+          },
+          "normalized_rating": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "origin",
+          "original_rating",
+          "normalized_rating"
+        ]
+      }
+    },
+    "responses": {
+      "400": {
+        "description": "invalid input, data invalid",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "errors": {}
+              },
+              "required": [
+                "code",
+                "status"
+              ]
+            }
+          }
+        }
+      },
+      "403": {
+        "description": "insufficient permissions",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "errors": {}
+              },
+              "required": [
+                "code",
+                "status"
+              ]
+            }
+          }
+        }
+      },
+      "404": {
+        "description": "resource not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "errors": {}
+              },
+              "required": [
+                "code",
+                "status"
+              ]
+            }
+          }
+        }
+      },
+      "409": {
+        "description": "conflicting resources",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "errors": {}
+              },
+              "required": [
+                "code",
+                "status"
+              ]
+            }
+          }
+        }
+      },
+      "500": {
+        "description": "unexpected error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "errors": {}
+              },
+              "required": [
+                "code",
+                "status"
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

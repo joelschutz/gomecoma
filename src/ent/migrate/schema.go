@@ -41,12 +41,37 @@ var (
 		Columns:    CountriesColumns,
 		PrimaryKey: []*schema.Column{CountriesColumns[0]},
 	}
+	// FilesColumns holds the columns for the "files" table.
+	FilesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "name", Type: field.TypeString},
+		{Name: "path", Type: field.TypeString},
+		{Name: "type", Type: field.TypeEnum, Enums: []string{"audio", "video", "image"}},
+		{Name: "external_id", Type: field.TypeString, Nullable: true},
+		{Name: "external_info_provider", Type: field.TypeString, Nullable: true},
+		{Name: "results", Type: field.TypeString, Nullable: true},
+		{Name: "synced", Type: field.TypeBool, Default: false},
+		{Name: "movie_file", Type: field.TypeInt, Unique: true, Nullable: true},
+	}
+	// FilesTable holds the schema information for the "files" table.
+	FilesTable = &schema.Table{
+		Name:       "files",
+		Columns:    FilesColumns,
+		PrimaryKey: []*schema.Column{FilesColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "files_movies_file",
+				Columns:    []*schema.Column{FilesColumns[8]},
+				RefColumns: []*schema.Column{MoviesColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
+	}
 	// MoviesColumns holds the columns for the "movies" table.
 	MoviesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "title", Type: field.TypeString},
 		{Name: "original_title", Type: field.TypeString, Nullable: true},
-		{Name: "languages", Type: field.TypeJSON, Nullable: true},
 		{Name: "release_date", Type: field.TypeTime, Nullable: true},
 		{Name: "plot", Type: field.TypeString, Nullable: true},
 		{Name: "duration", Type: field.TypeInt, Nullable: true},
@@ -61,7 +86,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "movies_pictures_poster",
-				Columns:    []*schema.Column{MoviesColumns[8]},
+				Columns:    []*schema.Column{MoviesColumns[7]},
 				RefColumns: []*schema.Column{PicturesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -283,6 +308,7 @@ var (
 	Tables = []*schema.Table{
 		ArtistsTable,
 		CountriesTable,
+		FilesTable,
 		MoviesTable,
 		MovieGenresTable,
 		PicturesTable,
@@ -298,6 +324,7 @@ var (
 
 func init() {
 	ArtistsTable.ForeignKeys[0].RefTable = PicturesTable
+	FilesTable.ForeignKeys[0].RefTable = MoviesTable
 	MoviesTable.ForeignKeys[0].RefTable = PicturesTable
 	PicturesTable.ForeignKeys[0].RefTable = ArtistsTable
 	PicturesTable.ForeignKeys[1].RefTable = MoviesTable

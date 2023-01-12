@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/joelschutz/gomecoma/src/ent/artist"
 	"github.com/joelschutz/gomecoma/src/ent/country"
+	"github.com/joelschutz/gomecoma/src/ent/file"
 	"github.com/joelschutz/gomecoma/src/ent/movie"
 	"github.com/joelschutz/gomecoma/src/ent/moviegenre"
 	"github.com/joelschutz/gomecoma/src/ent/picture"
@@ -56,18 +57,6 @@ func (mu *MovieUpdate) SetNillableOriginalTitle(s *string) *MovieUpdate {
 // ClearOriginalTitle clears the value of the "original_title" field.
 func (mu *MovieUpdate) ClearOriginalTitle() *MovieUpdate {
 	mu.mutation.ClearOriginalTitle()
-	return mu
-}
-
-// SetLanguages sets the "languages" field.
-func (mu *MovieUpdate) SetLanguages(s []string) *MovieUpdate {
-	mu.mutation.SetLanguages(s)
-	return mu
-}
-
-// ClearLanguages clears the value of the "languages" field.
-func (mu *MovieUpdate) ClearLanguages() *MovieUpdate {
-	mu.mutation.ClearLanguages()
 	return mu
 }
 
@@ -150,6 +139,25 @@ func (mu *MovieUpdate) SetNillableWatched(b *bool) *MovieUpdate {
 		mu.SetWatched(*b)
 	}
 	return mu
+}
+
+// SetFileID sets the "file" edge to the File entity by ID.
+func (mu *MovieUpdate) SetFileID(id int) *MovieUpdate {
+	mu.mutation.SetFileID(id)
+	return mu
+}
+
+// SetNillableFileID sets the "file" edge to the File entity by ID if the given value is not nil.
+func (mu *MovieUpdate) SetNillableFileID(id *int) *MovieUpdate {
+	if id != nil {
+		mu = mu.SetFileID(*id)
+	}
+	return mu
+}
+
+// SetFile sets the "file" edge to the File entity.
+func (mu *MovieUpdate) SetFile(f *File) *MovieUpdate {
+	return mu.SetFileID(f.ID)
 }
 
 // AddRatingIDs adds the "ratings" edge to the Rating entity by IDs.
@@ -279,6 +287,12 @@ func (mu *MovieUpdate) AddCountries(c ...*Country) *MovieUpdate {
 // Mutation returns the MovieMutation object of the builder.
 func (mu *MovieUpdate) Mutation() *MovieMutation {
 	return mu.mutation
+}
+
+// ClearFile clears the "file" edge to the File entity.
+func (mu *MovieUpdate) ClearFile() *MovieUpdate {
+	mu.mutation.ClearFile()
+	return mu
 }
 
 // ClearRatings clears all "ratings" edges to the Rating entity.
@@ -526,19 +540,6 @@ func (mu *MovieUpdate) sqlSave(ctx context.Context) (n int, err error) {
 			Column: movie.FieldOriginalTitle,
 		})
 	}
-	if value, ok := mu.mutation.Languages(); ok {
-		_spec.Fields.Set = append(_spec.Fields.Set, &sqlgraph.FieldSpec{
-			Type:   field.TypeJSON,
-			Value:  value,
-			Column: movie.FieldLanguages,
-		})
-	}
-	if mu.mutation.LanguagesCleared() {
-		_spec.Fields.Clear = append(_spec.Fields.Clear, &sqlgraph.FieldSpec{
-			Type:   field.TypeJSON,
-			Column: movie.FieldLanguages,
-		})
-	}
 	if value, ok := mu.mutation.ReleaseDate(); ok {
 		_spec.Fields.Set = append(_spec.Fields.Set, &sqlgraph.FieldSpec{
 			Type:   field.TypeTime,
@@ -591,6 +592,41 @@ func (mu *MovieUpdate) sqlSave(ctx context.Context) (n int, err error) {
 			Value:  value,
 			Column: movie.FieldWatched,
 		})
+	}
+	if mu.mutation.FileCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: false,
+			Table:   movie.FileTable,
+			Columns: []string{movie.FileColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: &sqlgraph.FieldSpec{
+					Type:   field.TypeInt,
+					Column: file.FieldID,
+				},
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := mu.mutation.FileIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: false,
+			Table:   movie.FileTable,
+			Columns: []string{movie.FileColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: &sqlgraph.FieldSpec{
+					Type:   field.TypeInt,
+					Column: file.FieldID,
+				},
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if mu.mutation.RatingsCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -1050,18 +1086,6 @@ func (muo *MovieUpdateOne) ClearOriginalTitle() *MovieUpdateOne {
 	return muo
 }
 
-// SetLanguages sets the "languages" field.
-func (muo *MovieUpdateOne) SetLanguages(s []string) *MovieUpdateOne {
-	muo.mutation.SetLanguages(s)
-	return muo
-}
-
-// ClearLanguages clears the value of the "languages" field.
-func (muo *MovieUpdateOne) ClearLanguages() *MovieUpdateOne {
-	muo.mutation.ClearLanguages()
-	return muo
-}
-
 // SetReleaseDate sets the "release_date" field.
 func (muo *MovieUpdateOne) SetReleaseDate(t time.Time) *MovieUpdateOne {
 	muo.mutation.SetReleaseDate(t)
@@ -1141,6 +1165,25 @@ func (muo *MovieUpdateOne) SetNillableWatched(b *bool) *MovieUpdateOne {
 		muo.SetWatched(*b)
 	}
 	return muo
+}
+
+// SetFileID sets the "file" edge to the File entity by ID.
+func (muo *MovieUpdateOne) SetFileID(id int) *MovieUpdateOne {
+	muo.mutation.SetFileID(id)
+	return muo
+}
+
+// SetNillableFileID sets the "file" edge to the File entity by ID if the given value is not nil.
+func (muo *MovieUpdateOne) SetNillableFileID(id *int) *MovieUpdateOne {
+	if id != nil {
+		muo = muo.SetFileID(*id)
+	}
+	return muo
+}
+
+// SetFile sets the "file" edge to the File entity.
+func (muo *MovieUpdateOne) SetFile(f *File) *MovieUpdateOne {
+	return muo.SetFileID(f.ID)
 }
 
 // AddRatingIDs adds the "ratings" edge to the Rating entity by IDs.
@@ -1270,6 +1313,12 @@ func (muo *MovieUpdateOne) AddCountries(c ...*Country) *MovieUpdateOne {
 // Mutation returns the MovieMutation object of the builder.
 func (muo *MovieUpdateOne) Mutation() *MovieMutation {
 	return muo.mutation
+}
+
+// ClearFile clears the "file" edge to the File entity.
+func (muo *MovieUpdateOne) ClearFile() *MovieUpdateOne {
+	muo.mutation.ClearFile()
+	return muo
 }
 
 // ClearRatings clears all "ratings" edges to the Rating entity.
@@ -1541,19 +1590,6 @@ func (muo *MovieUpdateOne) sqlSave(ctx context.Context) (_node *Movie, err error
 			Column: movie.FieldOriginalTitle,
 		})
 	}
-	if value, ok := muo.mutation.Languages(); ok {
-		_spec.Fields.Set = append(_spec.Fields.Set, &sqlgraph.FieldSpec{
-			Type:   field.TypeJSON,
-			Value:  value,
-			Column: movie.FieldLanguages,
-		})
-	}
-	if muo.mutation.LanguagesCleared() {
-		_spec.Fields.Clear = append(_spec.Fields.Clear, &sqlgraph.FieldSpec{
-			Type:   field.TypeJSON,
-			Column: movie.FieldLanguages,
-		})
-	}
 	if value, ok := muo.mutation.ReleaseDate(); ok {
 		_spec.Fields.Set = append(_spec.Fields.Set, &sqlgraph.FieldSpec{
 			Type:   field.TypeTime,
@@ -1606,6 +1642,41 @@ func (muo *MovieUpdateOne) sqlSave(ctx context.Context) (_node *Movie, err error
 			Value:  value,
 			Column: movie.FieldWatched,
 		})
+	}
+	if muo.mutation.FileCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: false,
+			Table:   movie.FileTable,
+			Columns: []string{movie.FileColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: &sqlgraph.FieldSpec{
+					Type:   field.TypeInt,
+					Column: file.FieldID,
+				},
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := muo.mutation.FileIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: false,
+			Table:   movie.FileTable,
+			Columns: []string{movie.FileColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: &sqlgraph.FieldSpec{
+					Type:   field.TypeInt,
+					Column: file.FieldID,
+				},
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if muo.mutation.RatingsCleared() {
 		edge := &sqlgraph.EdgeSpec{

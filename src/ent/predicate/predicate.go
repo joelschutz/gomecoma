@@ -12,6 +12,9 @@ type Artist func(*sql.Selector)
 // Country is the predicate function for country builders.
 type Country func(*sql.Selector)
 
+// File is the predicate function for file builders.
+type File func(*sql.Selector)
+
 // Movie is the predicate function for movie builders.
 type Movie func(*sql.Selector)
 

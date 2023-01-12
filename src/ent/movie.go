@@ -3,12 +3,12 @@
 package ent
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
+	"github.com/joelschutz/gomecoma/src/ent/file"
 	"github.com/joelschutz/gomecoma/src/ent/movie"
 	"github.com/joelschutz/gomecoma/src/ent/picture"
 )
@@ -22,8 +22,6 @@ type Movie struct {
 	Title string `json:"title,omitempty"`
 	// OriginalTitle holds the value of the "original_title" field.
 	OriginalTitle string `json:"original_title,omitempty"`
-	// Languages holds the value of the "languages" field.
-	Languages []string `json:"languages,omitempty"`
 	// ReleaseDate holds the value of the "release_date" field.
 	ReleaseDate time.Time `json:"release_date,omitempty"`
 	// Plot holds the value of the "plot" field.
@@ -40,6 +38,8 @@ type Movie struct {
 
 // MovieEdges holds the relations/edges for other nodes in the graph.
 type MovieEdges struct {
+	// File holds the value of the file edge.
+	File *File `json:"file,omitempty"`
 	// Ratings holds the value of the ratings edge.
 	Ratings []*Rating `json:"ratings,omitempty"`
 	// Poster holds the value of the poster edge.
@@ -58,13 +58,27 @@ type MovieEdges struct {
 	Countries []*Country `json:"countries,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [8]bool
+	loadedTypes [9]bool
+}
+
+// FileOrErr returns the File value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e MovieEdges) FileOrErr() (*File, error) {
+	if e.loadedTypes[0] {
+		if e.File == nil {
+			// The edge file was loaded in eager-loading,
+			// but was not found.
+			return nil, &NotFoundError{label: file.Label}
+		}
+		return e.File, nil
+	}
+	return nil, &NotLoadedError{edge: "file"}
 }
 
 // RatingsOrErr returns the Ratings value or an error if the edge
 // was not loaded in eager-loading.
 func (e MovieEdges) RatingsOrErr() ([]*Rating, error) {
-	if e.loadedTypes[0] {
+	if e.loadedTypes[1] {
 		return e.Ratings, nil
 	}
 	return nil, &NotLoadedError{edge: "ratings"}
@@ -73,7 +87,7 @@ func (e MovieEdges) RatingsOrErr() ([]*Rating, error) {
 // PosterOrErr returns the Poster value or an error if the edge
 // was not loaded in eager-loading, or loaded but was not found.
 func (e MovieEdges) PosterOrErr() (*Picture, error) {
-	if e.loadedTypes[1] {
+	if e.loadedTypes[2] {
 		if e.Poster == nil {
 			// The edge poster was loaded in eager-loading,
 			// but was not found.
@@ -87,7 +101,7 @@ func (e MovieEdges) PosterOrErr() (*Picture, error) {
 // FanartOrErr returns the Fanart value or an error if the edge
 // was not loaded in eager-loading.
 func (e MovieEdges) FanartOrErr() ([]*Picture, error) {
-	if e.loadedTypes[2] {
+	if e.loadedTypes[3] {
 		return e.Fanart, nil
 	}
 	return nil, &NotLoadedError{edge: "fanart"}
@@ -96,7 +110,7 @@ func (e MovieEdges) FanartOrErr() ([]*Picture, error) {
 // CastOrErr returns the Cast value or an error if the edge
 // was not loaded in eager-loading.
 func (e MovieEdges) CastOrErr() ([]*Artist, error) {
-	if e.loadedTypes[3] {
+	if e.loadedTypes[4] {
 		return e.Cast, nil
 	}
 	return nil, &NotLoadedError{edge: "cast"}
@@ -105,7 +119,7 @@ func (e MovieEdges) CastOrErr() ([]*Artist, error) {
 // DirectorsOrErr returns the Directors value or an error if the edge
 // was not loaded in eager-loading.
 func (e MovieEdges) DirectorsOrErr() ([]*Artist, error) {
-	if e.loadedTypes[4] {
+	if e.loadedTypes[5] {
 		return e.Directors, nil
 	}
 	return nil, &NotLoadedError{edge: "directors"}
@@ -114,7 +128,7 @@ func (e MovieEdges) DirectorsOrErr() ([]*Artist, error) {
 // WritersOrErr returns the Writers value or an error if the edge
 // was not loaded in eager-loading.
 func (e MovieEdges) WritersOrErr() ([]*Artist, error) {
-	if e.loadedTypes[5] {
+	if e.loadedTypes[6] {
 		return e.Writers, nil
 	}
 	return nil, &NotLoadedError{edge: "writers"}
@@ -123,7 +137,7 @@ func (e MovieEdges) WritersOrErr() ([]*Artist, error) {
 // GenresOrErr returns the Genres value or an error if the edge
 // was not loaded in eager-loading.
 func (e MovieEdges) GenresOrErr() ([]*MovieGenre, error) {
-	if e.loadedTypes[6] {
+	if e.loadedTypes[7] {
 		return e.Genres, nil
 	}
 	return nil, &NotLoadedError{edge: "genres"}
@@ -132,7 +146,7 @@ func (e MovieEdges) GenresOrErr() ([]*MovieGenre, error) {
 // CountriesOrErr returns the Countries value or an error if the edge
 // was not loaded in eager-loading.
 func (e MovieEdges) CountriesOrErr() ([]*Country, error) {
-	if e.loadedTypes[7] {
+	if e.loadedTypes[8] {
 		return e.Countries, nil
 	}
 	return nil, &NotLoadedError{edge: "countries"}
@@ -143,8 +157,6 @@ func (*Movie) scanValues(columns []string) ([]interface{}, error) {
 	values := make([]interface{}, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case movie.FieldLanguages:
-			values[i] = new([]byte)
 		case movie.FieldWatched:
 			values[i] = new(sql.NullBool)
 		case movie.FieldID, movie.FieldDuration:
@@ -188,14 +200,6 @@ func (m *Movie) assignValues(columns []string, values []interface{}) error {
 			} else if value.Valid {
 				m.OriginalTitle = value.String
 			}
-		case movie.FieldLanguages:
-			if value, ok := values[i].(*[]byte); !ok {
-				return fmt.Errorf("unexpected type %T for field languages", values[i])
-			} else if value != nil && len(*value) > 0 {
-				if err := json.Unmarshal(*value, &m.Languages); err != nil {
-					return fmt.Errorf("unmarshal field languages: %w", err)
-				}
-			}
 		case movie.FieldReleaseDate:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field release_date", values[i])
@@ -230,6 +234,11 @@ func (m *Movie) assignValues(columns []string, values []interface{}) error {
 		}
 	}
 	return nil
+}
+
+// QueryFile queries the "file" edge of the Movie entity.
+func (m *Movie) QueryFile() *FileQuery {
+	return (&MovieClient{config: m.config}).QueryFile(m)
 }
 
 // QueryRatings queries the "ratings" edge of the Movie entity.
@@ -299,8 +308,6 @@ func (m *Movie) String() string {
 	builder.WriteString(m.Title)
 	builder.WriteString(", original_title=")
 	builder.WriteString(m.OriginalTitle)
-	builder.WriteString(", languages=")
-	builder.WriteString(fmt.Sprintf("%v", m.Languages))
 	builder.WriteString(", release_date=")
 	builder.WriteString(m.ReleaseDate.Format(time.ANSIC))
 	builder.WriteString(", plot=")

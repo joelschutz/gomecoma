@@ -16,7 +16,7 @@ func (Movie) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("title"),
 		field.String("original_title").Optional(),
-		field.Strings("languages").Optional(),
+		// field.Strings("languages").Optional(),
 		field.Time("release_date").Optional(),
 		field.String("plot").Optional(),
 		field.Int("duration").Optional(),
@@ -27,6 +27,7 @@ func (Movie) Fields() []ent.Field {
 // Edges of the Movie.
 func (Movie) Edges() []ent.Edge {
 	return []ent.Edge{
+		edge.To("file", File.Type).Unique(),
 		edge.To("ratings", Rating.Type),
 		edge.To("poster", Picture.Type).Unique(),
 		edge.To("fanart", Picture.Type),

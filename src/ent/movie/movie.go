@@ -11,8 +11,6 @@ const (
 	FieldTitle = "title"
 	// FieldOriginalTitle holds the string denoting the original_title field in the database.
 	FieldOriginalTitle = "original_title"
-	// FieldLanguages holds the string denoting the languages field in the database.
-	FieldLanguages = "languages"
 	// FieldReleaseDate holds the string denoting the release_date field in the database.
 	FieldReleaseDate = "release_date"
 	// FieldPlot holds the string denoting the plot field in the database.
@@ -21,6 +19,8 @@ const (
 	FieldDuration = "duration"
 	// FieldWatched holds the string denoting the watched field in the database.
 	FieldWatched = "watched"
+	// EdgeFile holds the string denoting the file edge name in mutations.
+	EdgeFile = "file"
 	// EdgeRatings holds the string denoting the ratings edge name in mutations.
 	EdgeRatings = "ratings"
 	// EdgePoster holds the string denoting the poster edge name in mutations.
@@ -39,6 +39,13 @@ const (
 	EdgeCountries = "countries"
 	// Table holds the table name of the movie in the database.
 	Table = "movies"
+	// FileTable is the table that holds the file relation/edge.
+	FileTable = "files"
+	// FileInverseTable is the table name for the File entity.
+	// It exists in this package in order to avoid circular dependency with the "file" package.
+	FileInverseTable = "files"
+	// FileColumn is the table column denoting the file relation/edge.
+	FileColumn = "movie_file"
 	// RatingsTable is the table that holds the ratings relation/edge.
 	RatingsTable = "ratings"
 	// RatingsInverseTable is the table name for the Rating entity.
@@ -92,7 +99,6 @@ var Columns = []string{
 	FieldID,
 	FieldTitle,
 	FieldOriginalTitle,
-	FieldLanguages,
 	FieldReleaseDate,
 	FieldPlot,
 	FieldDuration,

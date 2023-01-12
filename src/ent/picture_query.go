@@ -4,7 +4,6 @@ package ent
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math"
 
@@ -107,7 +106,7 @@ func (pq *PictureQuery) FirstIDX(ctx context.Context) int {
 }
 
 // Only returns a single Picture entity found by the query, ensuring it only returns one.
-// Returns a *NotSingularError when exactly one Picture entity is not found.
+// Returns a *NotSingularError when more than one Picture entity is found.
 // Returns a *NotFoundError when no Picture entities are found.
 func (pq *PictureQuery) Only(ctx context.Context) (*Picture, error) {
 	nodes, err := pq.Limit(2).All(ctx)
@@ -134,7 +133,7 @@ func (pq *PictureQuery) OnlyX(ctx context.Context) *Picture {
 }
 
 // OnlyID is like Only, but returns the only Picture ID in the query.
-// Returns a *NotSingularError when exactly one Picture ID is not found.
+// Returns a *NotSingularError when more than one Picture ID is found.
 // Returns a *NotFoundError when no entities are found.
 func (pq *PictureQuery) OnlyID(ctx context.Context) (id int, err error) {
 	var ids []int
@@ -243,8 +242,9 @@ func (pq *PictureQuery) Clone() *PictureQuery {
 		order:      append([]OrderFunc{}, pq.order...),
 		predicates: append([]predicate.Picture{}, pq.predicates...),
 		// clone intermediate query.
-		sql:  pq.sql.Clone(),
-		path: pq.path,
+		sql:    pq.sql.Clone(),
+		path:   pq.path,
+		unique: pq.unique,
 	}
 }
 
@@ -264,15 +264,17 @@ func (pq *PictureQuery) Clone() *PictureQuery {
 //		Scan(ctx, &v)
 //
 func (pq *PictureQuery) GroupBy(field string, fields ...string) *PictureGroupBy {
-	group := &PictureGroupBy{config: pq.config}
-	group.fields = append([]string{field}, fields...)
-	group.path = func(ctx context.Context) (prev *sql.Selector, err error) {
+	grbuild := &PictureGroupBy{config: pq.config}
+	grbuild.fields = append([]string{field}, fields...)
+	grbuild.path = func(ctx context.Context) (prev *sql.Selector, err error) {
 		if err := pq.prepareQuery(ctx); err != nil {
 			return nil, err
 		}
 		return pq.sqlQuery(ctx), nil
 	}
-	return group
+	grbuild.label = picture.Label
+	grbuild.flds, grbuild.scan = &grbuild.fields, grbuild.Scan
+	return grbuild
 }
 
 // Select allows the selection one or more fields/columns for the given query,
@@ -290,7 +292,10 @@ func (pq *PictureQuery) GroupBy(field string, fields ...string) *PictureGroupBy 
 //
 func (pq *PictureQuery) Select(fields ...string) *PictureSelect {
 	pq.fields = append(pq.fields, fields...)
-	return &PictureSelect{PictureQuery: pq}
+	selbuild := &PictureSelect{PictureQuery: pq}
+	selbuild.label = picture.Label
+	selbuild.flds, selbuild.scan = &pq.fields, selbuild.Scan
+	return selbuild
 }
 
 func (pq *PictureQuery) prepareQuery(ctx context.Context) error {
@@ -309,7 +314,7 @@ func (pq *PictureQuery) prepareQuery(ctx context.Context) error {
 	return nil
 }
 
-func (pq *PictureQuery) sqlAll(ctx context.Context) ([]*Picture, error) {
+func (pq *PictureQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Picture, error) {
 	var (
 		nodes   = []*Picture{}
 		withFKs = pq.withFKs
@@ -319,16 +324,15 @@ func (pq *PictureQuery) sqlAll(ctx context.Context) ([]*Picture, error) {
 		_spec.Node.Columns = append(_spec.Node.Columns, picture.ForeignKeys...)
 	}
 	_spec.ScanValues = func(columns []string) ([]interface{}, error) {
-		node := &Picture{config: pq.config}
-		nodes = append(nodes, node)
-		return node.scanValues(columns)
+		return (*Picture).scanValues(nil, columns)
 	}
 	_spec.Assign = func(columns []string, values []interface{}) error {
-		if len(nodes) == 0 {
-			return fmt.Errorf("ent: Assign called without calling ScanValues")
-		}
-		node := nodes[len(nodes)-1]
+		node := &Picture{config: pq.config}
+		nodes = append(nodes, node)
 		return node.assignValues(columns, values)
+	}
+	for i := range hooks {
+		hooks[i](ctx, _spec)
 	}
 	if err := sqlgraph.QueryNodes(ctx, pq.driver, _spec); err != nil {
 		return nil, err
@@ -439,6 +443,7 @@ func (pq *PictureQuery) sqlQuery(ctx context.Context) *sql.Selector {
 // PictureGroupBy is the group-by builder for Picture entities.
 type PictureGroupBy struct {
 	config
+	selector
 	fields []string
 	fns    []AggregateFunc
 	// intermediate query (i.e. traversal path).
@@ -460,209 +465,6 @@ func (pgb *PictureGroupBy) Scan(ctx context.Context, v interface{}) error {
 	}
 	pgb.sql = query
 	return pgb.sqlScan(ctx, v)
-}
-
-// ScanX is like Scan, but panics if an error occurs.
-func (pgb *PictureGroupBy) ScanX(ctx context.Context, v interface{}) {
-	if err := pgb.Scan(ctx, v); err != nil {
-		panic(err)
-	}
-}
-
-// Strings returns list of strings from group-by.
-// It is only allowed when executing a group-by query with one field.
-func (pgb *PictureGroupBy) Strings(ctx context.Context) ([]string, error) {
-	if len(pgb.fields) > 1 {
-		return nil, errors.New("ent: PictureGroupBy.Strings is not achievable when grouping more than 1 field")
-	}
-	var v []string
-	if err := pgb.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// StringsX is like Strings, but panics if an error occurs.
-func (pgb *PictureGroupBy) StringsX(ctx context.Context) []string {
-	v, err := pgb.Strings(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// String returns a single string from a group-by query.
-// It is only allowed when executing a group-by query with one field.
-func (pgb *PictureGroupBy) String(ctx context.Context) (_ string, err error) {
-	var v []string
-	if v, err = pgb.Strings(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{picture.Label}
-	default:
-		err = fmt.Errorf("ent: PictureGroupBy.Strings returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// StringX is like String, but panics if an error occurs.
-func (pgb *PictureGroupBy) StringX(ctx context.Context) string {
-	v, err := pgb.String(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Ints returns list of ints from group-by.
-// It is only allowed when executing a group-by query with one field.
-func (pgb *PictureGroupBy) Ints(ctx context.Context) ([]int, error) {
-	if len(pgb.fields) > 1 {
-		return nil, errors.New("ent: PictureGroupBy.Ints is not achievable when grouping more than 1 field")
-	}
-	var v []int
-	if err := pgb.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// IntsX is like Ints, but panics if an error occurs.
-func (pgb *PictureGroupBy) IntsX(ctx context.Context) []int {
-	v, err := pgb.Ints(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Int returns a single int from a group-by query.
-// It is only allowed when executing a group-by query with one field.
-func (pgb *PictureGroupBy) Int(ctx context.Context) (_ int, err error) {
-	var v []int
-	if v, err = pgb.Ints(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{picture.Label}
-	default:
-		err = fmt.Errorf("ent: PictureGroupBy.Ints returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// IntX is like Int, but panics if an error occurs.
-func (pgb *PictureGroupBy) IntX(ctx context.Context) int {
-	v, err := pgb.Int(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Float64s returns list of float64s from group-by.
-// It is only allowed when executing a group-by query with one field.
-func (pgb *PictureGroupBy) Float64s(ctx context.Context) ([]float64, error) {
-	if len(pgb.fields) > 1 {
-		return nil, errors.New("ent: PictureGroupBy.Float64s is not achievable when grouping more than 1 field")
-	}
-	var v []float64
-	if err := pgb.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// Float64sX is like Float64s, but panics if an error occurs.
-func (pgb *PictureGroupBy) Float64sX(ctx context.Context) []float64 {
-	v, err := pgb.Float64s(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Float64 returns a single float64 from a group-by query.
-// It is only allowed when executing a group-by query with one field.
-func (pgb *PictureGroupBy) Float64(ctx context.Context) (_ float64, err error) {
-	var v []float64
-	if v, err = pgb.Float64s(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{picture.Label}
-	default:
-		err = fmt.Errorf("ent: PictureGroupBy.Float64s returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// Float64X is like Float64, but panics if an error occurs.
-func (pgb *PictureGroupBy) Float64X(ctx context.Context) float64 {
-	v, err := pgb.Float64(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Bools returns list of bools from group-by.
-// It is only allowed when executing a group-by query with one field.
-func (pgb *PictureGroupBy) Bools(ctx context.Context) ([]bool, error) {
-	if len(pgb.fields) > 1 {
-		return nil, errors.New("ent: PictureGroupBy.Bools is not achievable when grouping more than 1 field")
-	}
-	var v []bool
-	if err := pgb.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// BoolsX is like Bools, but panics if an error occurs.
-func (pgb *PictureGroupBy) BoolsX(ctx context.Context) []bool {
-	v, err := pgb.Bools(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Bool returns a single bool from a group-by query.
-// It is only allowed when executing a group-by query with one field.
-func (pgb *PictureGroupBy) Bool(ctx context.Context) (_ bool, err error) {
-	var v []bool
-	if v, err = pgb.Bools(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{picture.Label}
-	default:
-		err = fmt.Errorf("ent: PictureGroupBy.Bools returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// BoolX is like Bool, but panics if an error occurs.
-func (pgb *PictureGroupBy) BoolX(ctx context.Context) bool {
-	v, err := pgb.Bool(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
 }
 
 func (pgb *PictureGroupBy) sqlScan(ctx context.Context, v interface{}) error {
@@ -706,6 +508,7 @@ func (pgb *PictureGroupBy) sqlQuery() *sql.Selector {
 // PictureSelect is the builder for selecting fields of Picture entities.
 type PictureSelect struct {
 	*PictureQuery
+	selector
 	// intermediate query (i.e. traversal path).
 	sql *sql.Selector
 }
@@ -717,201 +520,6 @@ func (ps *PictureSelect) Scan(ctx context.Context, v interface{}) error {
 	}
 	ps.sql = ps.PictureQuery.sqlQuery(ctx)
 	return ps.sqlScan(ctx, v)
-}
-
-// ScanX is like Scan, but panics if an error occurs.
-func (ps *PictureSelect) ScanX(ctx context.Context, v interface{}) {
-	if err := ps.Scan(ctx, v); err != nil {
-		panic(err)
-	}
-}
-
-// Strings returns list of strings from a selector. It is only allowed when selecting one field.
-func (ps *PictureSelect) Strings(ctx context.Context) ([]string, error) {
-	if len(ps.fields) > 1 {
-		return nil, errors.New("ent: PictureSelect.Strings is not achievable when selecting more than 1 field")
-	}
-	var v []string
-	if err := ps.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// StringsX is like Strings, but panics if an error occurs.
-func (ps *PictureSelect) StringsX(ctx context.Context) []string {
-	v, err := ps.Strings(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// String returns a single string from a selector. It is only allowed when selecting one field.
-func (ps *PictureSelect) String(ctx context.Context) (_ string, err error) {
-	var v []string
-	if v, err = ps.Strings(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{picture.Label}
-	default:
-		err = fmt.Errorf("ent: PictureSelect.Strings returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// StringX is like String, but panics if an error occurs.
-func (ps *PictureSelect) StringX(ctx context.Context) string {
-	v, err := ps.String(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Ints returns list of ints from a selector. It is only allowed when selecting one field.
-func (ps *PictureSelect) Ints(ctx context.Context) ([]int, error) {
-	if len(ps.fields) > 1 {
-		return nil, errors.New("ent: PictureSelect.Ints is not achievable when selecting more than 1 field")
-	}
-	var v []int
-	if err := ps.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// IntsX is like Ints, but panics if an error occurs.
-func (ps *PictureSelect) IntsX(ctx context.Context) []int {
-	v, err := ps.Ints(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Int returns a single int from a selector. It is only allowed when selecting one field.
-func (ps *PictureSelect) Int(ctx context.Context) (_ int, err error) {
-	var v []int
-	if v, err = ps.Ints(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{picture.Label}
-	default:
-		err = fmt.Errorf("ent: PictureSelect.Ints returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// IntX is like Int, but panics if an error occurs.
-func (ps *PictureSelect) IntX(ctx context.Context) int {
-	v, err := ps.Int(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Float64s returns list of float64s from a selector. It is only allowed when selecting one field.
-func (ps *PictureSelect) Float64s(ctx context.Context) ([]float64, error) {
-	if len(ps.fields) > 1 {
-		return nil, errors.New("ent: PictureSelect.Float64s is not achievable when selecting more than 1 field")
-	}
-	var v []float64
-	if err := ps.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// Float64sX is like Float64s, but panics if an error occurs.
-func (ps *PictureSelect) Float64sX(ctx context.Context) []float64 {
-	v, err := ps.Float64s(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Float64 returns a single float64 from a selector. It is only allowed when selecting one field.
-func (ps *PictureSelect) Float64(ctx context.Context) (_ float64, err error) {
-	var v []float64
-	if v, err = ps.Float64s(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{picture.Label}
-	default:
-		err = fmt.Errorf("ent: PictureSelect.Float64s returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// Float64X is like Float64, but panics if an error occurs.
-func (ps *PictureSelect) Float64X(ctx context.Context) float64 {
-	v, err := ps.Float64(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Bools returns list of bools from a selector. It is only allowed when selecting one field.
-func (ps *PictureSelect) Bools(ctx context.Context) ([]bool, error) {
-	if len(ps.fields) > 1 {
-		return nil, errors.New("ent: PictureSelect.Bools is not achievable when selecting more than 1 field")
-	}
-	var v []bool
-	if err := ps.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// BoolsX is like Bools, but panics if an error occurs.
-func (ps *PictureSelect) BoolsX(ctx context.Context) []bool {
-	v, err := ps.Bools(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Bool returns a single bool from a selector. It is only allowed when selecting one field.
-func (ps *PictureSelect) Bool(ctx context.Context) (_ bool, err error) {
-	var v []bool
-	if v, err = ps.Bools(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{picture.Label}
-	default:
-		err = fmt.Errorf("ent: PictureSelect.Bools returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// BoolX is like Bool, but panics if an error occurs.
-func (ps *PictureSelect) BoolX(ctx context.Context) bool {
-	v, err := ps.Bool(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
 }
 
 func (ps *PictureSelect) sqlScan(ctx context.Context, v interface{}) error {

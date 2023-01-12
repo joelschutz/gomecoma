@@ -5,7 +5,6 @@ package ent
 import (
 	"context"
 	"database/sql/driver"
-	"errors"
 	"fmt"
 	"math"
 
@@ -14,6 +13,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/joelschutz/gomecoma/src/ent/artist"
 	"github.com/joelschutz/gomecoma/src/ent/country"
+	"github.com/joelschutz/gomecoma/src/ent/file"
 	"github.com/joelschutz/gomecoma/src/ent/movie"
 	"github.com/joelschutz/gomecoma/src/ent/moviegenre"
 	"github.com/joelschutz/gomecoma/src/ent/picture"
@@ -31,6 +31,7 @@ type MovieQuery struct {
 	fields     []string
 	predicates []predicate.Movie
 	// eager-loading edges.
+	withFile      *FileQuery
 	withRatings   *RatingQuery
 	withPoster    *PictureQuery
 	withFanart    *PictureQuery
@@ -74,6 +75,28 @@ func (mq *MovieQuery) Unique(unique bool) *MovieQuery {
 func (mq *MovieQuery) Order(o ...OrderFunc) *MovieQuery {
 	mq.order = append(mq.order, o...)
 	return mq
+}
+
+// QueryFile chains the current query on the "file" edge.
+func (mq *MovieQuery) QueryFile() *FileQuery {
+	query := &FileQuery{config: mq.config}
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := mq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := mq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(movie.Table, movie.FieldID, selector),
+			sqlgraph.To(file.Table, file.FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, false, movie.FileTable, movie.FileColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(mq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
 }
 
 // QueryRatings chains the current query on the "ratings" edge.
@@ -298,7 +321,7 @@ func (mq *MovieQuery) FirstIDX(ctx context.Context) int {
 }
 
 // Only returns a single Movie entity found by the query, ensuring it only returns one.
-// Returns a *NotSingularError when exactly one Movie entity is not found.
+// Returns a *NotSingularError when more than one Movie entity is found.
 // Returns a *NotFoundError when no Movie entities are found.
 func (mq *MovieQuery) Only(ctx context.Context) (*Movie, error) {
 	nodes, err := mq.Limit(2).All(ctx)
@@ -325,7 +348,7 @@ func (mq *MovieQuery) OnlyX(ctx context.Context) *Movie {
 }
 
 // OnlyID is like Only, but returns the only Movie ID in the query.
-// Returns a *NotSingularError when exactly one Movie ID is not found.
+// Returns a *NotSingularError when more than one Movie ID is found.
 // Returns a *NotFoundError when no entities are found.
 func (mq *MovieQuery) OnlyID(ctx context.Context) (id int, err error) {
 	var ids []int
@@ -433,6 +456,7 @@ func (mq *MovieQuery) Clone() *MovieQuery {
 		offset:        mq.offset,
 		order:         append([]OrderFunc{}, mq.order...),
 		predicates:    append([]predicate.Movie{}, mq.predicates...),
+		withFile:      mq.withFile.Clone(),
 		withRatings:   mq.withRatings.Clone(),
 		withPoster:    mq.withPoster.Clone(),
 		withFanart:    mq.withFanart.Clone(),
@@ -442,9 +466,21 @@ func (mq *MovieQuery) Clone() *MovieQuery {
 		withGenres:    mq.withGenres.Clone(),
 		withCountries: mq.withCountries.Clone(),
 		// clone intermediate query.
-		sql:  mq.sql.Clone(),
-		path: mq.path,
+		sql:    mq.sql.Clone(),
+		path:   mq.path,
+		unique: mq.unique,
 	}
+}
+
+// WithFile tells the query-builder to eager-load the nodes that are connected to
+// the "file" edge. The optional arguments are used to configure the query builder of the edge.
+func (mq *MovieQuery) WithFile(opts ...func(*FileQuery)) *MovieQuery {
+	query := &FileQuery{config: mq.config}
+	for _, opt := range opts {
+		opt(query)
+	}
+	mq.withFile = query
+	return mq
 }
 
 // WithRatings tells the query-builder to eager-load the nodes that are connected to
@@ -551,15 +587,17 @@ func (mq *MovieQuery) WithCountries(opts ...func(*CountryQuery)) *MovieQuery {
 //		Scan(ctx, &v)
 //
 func (mq *MovieQuery) GroupBy(field string, fields ...string) *MovieGroupBy {
-	group := &MovieGroupBy{config: mq.config}
-	group.fields = append([]string{field}, fields...)
-	group.path = func(ctx context.Context) (prev *sql.Selector, err error) {
+	grbuild := &MovieGroupBy{config: mq.config}
+	grbuild.fields = append([]string{field}, fields...)
+	grbuild.path = func(ctx context.Context) (prev *sql.Selector, err error) {
 		if err := mq.prepareQuery(ctx); err != nil {
 			return nil, err
 		}
 		return mq.sqlQuery(ctx), nil
 	}
-	return group
+	grbuild.label = movie.Label
+	grbuild.flds, grbuild.scan = &grbuild.fields, grbuild.Scan
+	return grbuild
 }
 
 // Select allows the selection one or more fields/columns for the given query,
@@ -577,7 +615,10 @@ func (mq *MovieQuery) GroupBy(field string, fields ...string) *MovieGroupBy {
 //
 func (mq *MovieQuery) Select(fields ...string) *MovieSelect {
 	mq.fields = append(mq.fields, fields...)
-	return &MovieSelect{MovieQuery: mq}
+	selbuild := &MovieSelect{MovieQuery: mq}
+	selbuild.label = movie.Label
+	selbuild.flds, selbuild.scan = &mq.fields, selbuild.Scan
+	return selbuild
 }
 
 func (mq *MovieQuery) prepareQuery(ctx context.Context) error {
@@ -596,12 +637,13 @@ func (mq *MovieQuery) prepareQuery(ctx context.Context) error {
 	return nil
 }
 
-func (mq *MovieQuery) sqlAll(ctx context.Context) ([]*Movie, error) {
+func (mq *MovieQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Movie, error) {
 	var (
 		nodes       = []*Movie{}
 		withFKs     = mq.withFKs
 		_spec       = mq.querySpec()
-		loadedTypes = [8]bool{
+		loadedTypes = [9]bool{
+			mq.withFile != nil,
 			mq.withRatings != nil,
 			mq.withPoster != nil,
 			mq.withFanart != nil,
@@ -619,23 +661,50 @@ func (mq *MovieQuery) sqlAll(ctx context.Context) ([]*Movie, error) {
 		_spec.Node.Columns = append(_spec.Node.Columns, movie.ForeignKeys...)
 	}
 	_spec.ScanValues = func(columns []string) ([]interface{}, error) {
-		node := &Movie{config: mq.config}
-		nodes = append(nodes, node)
-		return node.scanValues(columns)
+		return (*Movie).scanValues(nil, columns)
 	}
 	_spec.Assign = func(columns []string, values []interface{}) error {
-		if len(nodes) == 0 {
-			return fmt.Errorf("ent: Assign called without calling ScanValues")
-		}
-		node := nodes[len(nodes)-1]
+		node := &Movie{config: mq.config}
+		nodes = append(nodes, node)
 		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
+	}
+	for i := range hooks {
+		hooks[i](ctx, _spec)
 	}
 	if err := sqlgraph.QueryNodes(ctx, mq.driver, _spec); err != nil {
 		return nil, err
 	}
 	if len(nodes) == 0 {
 		return nodes, nil
+	}
+
+	if query := mq.withFile; query != nil {
+		fks := make([]driver.Value, 0, len(nodes))
+		nodeids := make(map[int]*Movie)
+		for i := range nodes {
+			fks = append(fks, nodes[i].ID)
+			nodeids[nodes[i].ID] = nodes[i]
+		}
+		query.withFKs = true
+		query.Where(predicate.File(func(s *sql.Selector) {
+			s.Where(sql.InValues(movie.FileColumn, fks...))
+		}))
+		neighbors, err := query.All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, n := range neighbors {
+			fk := n.movie_file
+			if fk == nil {
+				return nil, fmt.Errorf(`foreign-key "movie_file" is nil for node %v`, n.ID)
+			}
+			node, ok := nodeids[*fk]
+			if !ok {
+				return nil, fmt.Errorf(`unexpected foreign-key "movie_file" returned %v for node %v`, *fk, n.ID)
+			}
+			node.Edges.File = n
+		}
 	}
 
 	if query := mq.withRatings; query != nil {
@@ -726,326 +795,266 @@ func (mq *MovieQuery) sqlAll(ctx context.Context) ([]*Movie, error) {
 	}
 
 	if query := mq.withCast; query != nil {
-		fks := make([]driver.Value, 0, len(nodes))
-		ids := make(map[int]*Movie, len(nodes))
-		for _, node := range nodes {
-			ids[node.ID] = node
-			fks = append(fks, node.ID)
+		edgeids := make([]driver.Value, len(nodes))
+		byid := make(map[int]*Movie)
+		nids := make(map[int]map[*Movie]struct{})
+		for i, node := range nodes {
+			edgeids[i] = node.ID
+			byid[node.ID] = node
 			node.Edges.Cast = []*Artist{}
 		}
-		var (
-			edgeids []int
-			edges   = make(map[int][]*Movie)
-		)
-		_spec := &sqlgraph.EdgeQuerySpec{
-			Edge: &sqlgraph.EdgeSpec{
-				Inverse: false,
-				Table:   movie.CastTable,
-				Columns: movie.CastPrimaryKey,
-			},
-			Predicate: func(s *sql.Selector) {
-				s.Where(sql.InValues(movie.CastPrimaryKey[0], fks...))
-			},
-			ScanValues: func() [2]interface{} {
-				return [2]interface{}{new(sql.NullInt64), new(sql.NullInt64)}
-			},
-			Assign: func(out, in interface{}) error {
-				eout, ok := out.(*sql.NullInt64)
-				if !ok || eout == nil {
-					return fmt.Errorf("unexpected id value for edge-out")
+		query.Where(func(s *sql.Selector) {
+			joinT := sql.Table(movie.CastTable)
+			s.Join(joinT).On(s.C(artist.FieldID), joinT.C(movie.CastPrimaryKey[1]))
+			s.Where(sql.InValues(joinT.C(movie.CastPrimaryKey[0]), edgeids...))
+			columns := s.SelectedColumns()
+			s.Select(joinT.C(movie.CastPrimaryKey[0]))
+			s.AppendSelect(columns...)
+			s.SetDistinct(false)
+		})
+		neighbors, err := query.sqlAll(ctx, func(_ context.Context, spec *sqlgraph.QuerySpec) {
+			assign := spec.Assign
+			values := spec.ScanValues
+			spec.ScanValues = func(columns []string) ([]interface{}, error) {
+				values, err := values(columns[1:])
+				if err != nil {
+					return nil, err
 				}
-				ein, ok := in.(*sql.NullInt64)
-				if !ok || ein == nil {
-					return fmt.Errorf("unexpected id value for edge-in")
+				return append([]interface{}{new(sql.NullInt64)}, values...), nil
+			}
+			spec.Assign = func(columns []string, values []interface{}) error {
+				outValue := int(values[0].(*sql.NullInt64).Int64)
+				inValue := int(values[1].(*sql.NullInt64).Int64)
+				if nids[inValue] == nil {
+					nids[inValue] = map[*Movie]struct{}{byid[outValue]: struct{}{}}
+					return assign(columns[1:], values[1:])
 				}
-				outValue := int(eout.Int64)
-				inValue := int(ein.Int64)
-				node, ok := ids[outValue]
-				if !ok {
-					return fmt.Errorf("unexpected node id in edges: %v", outValue)
-				}
-				if _, ok := edges[inValue]; !ok {
-					edgeids = append(edgeids, inValue)
-				}
-				edges[inValue] = append(edges[inValue], node)
+				nids[inValue][byid[outValue]] = struct{}{}
 				return nil
-			},
-		}
-		if err := sqlgraph.QueryEdges(ctx, mq.driver, _spec); err != nil {
-			return nil, fmt.Errorf(`query edges "cast": %w`, err)
-		}
-		query.Where(artist.IDIn(edgeids...))
-		neighbors, err := query.All(ctx)
+			}
+		})
 		if err != nil {
 			return nil, err
 		}
 		for _, n := range neighbors {
-			nodes, ok := edges[n.ID]
+			nodes, ok := nids[n.ID]
 			if !ok {
 				return nil, fmt.Errorf(`unexpected "cast" node returned %v`, n.ID)
 			}
-			for i := range nodes {
-				nodes[i].Edges.Cast = append(nodes[i].Edges.Cast, n)
+			for kn := range nodes {
+				kn.Edges.Cast = append(kn.Edges.Cast, n)
 			}
 		}
 	}
 
 	if query := mq.withDirectors; query != nil {
-		fks := make([]driver.Value, 0, len(nodes))
-		ids := make(map[int]*Movie, len(nodes))
-		for _, node := range nodes {
-			ids[node.ID] = node
-			fks = append(fks, node.ID)
+		edgeids := make([]driver.Value, len(nodes))
+		byid := make(map[int]*Movie)
+		nids := make(map[int]map[*Movie]struct{})
+		for i, node := range nodes {
+			edgeids[i] = node.ID
+			byid[node.ID] = node
 			node.Edges.Directors = []*Artist{}
 		}
-		var (
-			edgeids []int
-			edges   = make(map[int][]*Movie)
-		)
-		_spec := &sqlgraph.EdgeQuerySpec{
-			Edge: &sqlgraph.EdgeSpec{
-				Inverse: false,
-				Table:   movie.DirectorsTable,
-				Columns: movie.DirectorsPrimaryKey,
-			},
-			Predicate: func(s *sql.Selector) {
-				s.Where(sql.InValues(movie.DirectorsPrimaryKey[0], fks...))
-			},
-			ScanValues: func() [2]interface{} {
-				return [2]interface{}{new(sql.NullInt64), new(sql.NullInt64)}
-			},
-			Assign: func(out, in interface{}) error {
-				eout, ok := out.(*sql.NullInt64)
-				if !ok || eout == nil {
-					return fmt.Errorf("unexpected id value for edge-out")
+		query.Where(func(s *sql.Selector) {
+			joinT := sql.Table(movie.DirectorsTable)
+			s.Join(joinT).On(s.C(artist.FieldID), joinT.C(movie.DirectorsPrimaryKey[1]))
+			s.Where(sql.InValues(joinT.C(movie.DirectorsPrimaryKey[0]), edgeids...))
+			columns := s.SelectedColumns()
+			s.Select(joinT.C(movie.DirectorsPrimaryKey[0]))
+			s.AppendSelect(columns...)
+			s.SetDistinct(false)
+		})
+		neighbors, err := query.sqlAll(ctx, func(_ context.Context, spec *sqlgraph.QuerySpec) {
+			assign := spec.Assign
+			values := spec.ScanValues
+			spec.ScanValues = func(columns []string) ([]interface{}, error) {
+				values, err := values(columns[1:])
+				if err != nil {
+					return nil, err
 				}
-				ein, ok := in.(*sql.NullInt64)
-				if !ok || ein == nil {
-					return fmt.Errorf("unexpected id value for edge-in")
+				return append([]interface{}{new(sql.NullInt64)}, values...), nil
+			}
+			spec.Assign = func(columns []string, values []interface{}) error {
+				outValue := int(values[0].(*sql.NullInt64).Int64)
+				inValue := int(values[1].(*sql.NullInt64).Int64)
+				if nids[inValue] == nil {
+					nids[inValue] = map[*Movie]struct{}{byid[outValue]: struct{}{}}
+					return assign(columns[1:], values[1:])
 				}
-				outValue := int(eout.Int64)
-				inValue := int(ein.Int64)
-				node, ok := ids[outValue]
-				if !ok {
-					return fmt.Errorf("unexpected node id in edges: %v", outValue)
-				}
-				if _, ok := edges[inValue]; !ok {
-					edgeids = append(edgeids, inValue)
-				}
-				edges[inValue] = append(edges[inValue], node)
+				nids[inValue][byid[outValue]] = struct{}{}
 				return nil
-			},
-		}
-		if err := sqlgraph.QueryEdges(ctx, mq.driver, _spec); err != nil {
-			return nil, fmt.Errorf(`query edges "directors": %w`, err)
-		}
-		query.Where(artist.IDIn(edgeids...))
-		neighbors, err := query.All(ctx)
+			}
+		})
 		if err != nil {
 			return nil, err
 		}
 		for _, n := range neighbors {
-			nodes, ok := edges[n.ID]
+			nodes, ok := nids[n.ID]
 			if !ok {
 				return nil, fmt.Errorf(`unexpected "directors" node returned %v`, n.ID)
 			}
-			for i := range nodes {
-				nodes[i].Edges.Directors = append(nodes[i].Edges.Directors, n)
+			for kn := range nodes {
+				kn.Edges.Directors = append(kn.Edges.Directors, n)
 			}
 		}
 	}
 
 	if query := mq.withWriters; query != nil {
-		fks := make([]driver.Value, 0, len(nodes))
-		ids := make(map[int]*Movie, len(nodes))
-		for _, node := range nodes {
-			ids[node.ID] = node
-			fks = append(fks, node.ID)
+		edgeids := make([]driver.Value, len(nodes))
+		byid := make(map[int]*Movie)
+		nids := make(map[int]map[*Movie]struct{})
+		for i, node := range nodes {
+			edgeids[i] = node.ID
+			byid[node.ID] = node
 			node.Edges.Writers = []*Artist{}
 		}
-		var (
-			edgeids []int
-			edges   = make(map[int][]*Movie)
-		)
-		_spec := &sqlgraph.EdgeQuerySpec{
-			Edge: &sqlgraph.EdgeSpec{
-				Inverse: false,
-				Table:   movie.WritersTable,
-				Columns: movie.WritersPrimaryKey,
-			},
-			Predicate: func(s *sql.Selector) {
-				s.Where(sql.InValues(movie.WritersPrimaryKey[0], fks...))
-			},
-			ScanValues: func() [2]interface{} {
-				return [2]interface{}{new(sql.NullInt64), new(sql.NullInt64)}
-			},
-			Assign: func(out, in interface{}) error {
-				eout, ok := out.(*sql.NullInt64)
-				if !ok || eout == nil {
-					return fmt.Errorf("unexpected id value for edge-out")
+		query.Where(func(s *sql.Selector) {
+			joinT := sql.Table(movie.WritersTable)
+			s.Join(joinT).On(s.C(artist.FieldID), joinT.C(movie.WritersPrimaryKey[1]))
+			s.Where(sql.InValues(joinT.C(movie.WritersPrimaryKey[0]), edgeids...))
+			columns := s.SelectedColumns()
+			s.Select(joinT.C(movie.WritersPrimaryKey[0]))
+			s.AppendSelect(columns...)
+			s.SetDistinct(false)
+		})
+		neighbors, err := query.sqlAll(ctx, func(_ context.Context, spec *sqlgraph.QuerySpec) {
+			assign := spec.Assign
+			values := spec.ScanValues
+			spec.ScanValues = func(columns []string) ([]interface{}, error) {
+				values, err := values(columns[1:])
+				if err != nil {
+					return nil, err
 				}
-				ein, ok := in.(*sql.NullInt64)
-				if !ok || ein == nil {
-					return fmt.Errorf("unexpected id value for edge-in")
+				return append([]interface{}{new(sql.NullInt64)}, values...), nil
+			}
+			spec.Assign = func(columns []string, values []interface{}) error {
+				outValue := int(values[0].(*sql.NullInt64).Int64)
+				inValue := int(values[1].(*sql.NullInt64).Int64)
+				if nids[inValue] == nil {
+					nids[inValue] = map[*Movie]struct{}{byid[outValue]: struct{}{}}
+					return assign(columns[1:], values[1:])
 				}
-				outValue := int(eout.Int64)
-				inValue := int(ein.Int64)
-				node, ok := ids[outValue]
-				if !ok {
-					return fmt.Errorf("unexpected node id in edges: %v", outValue)
-				}
-				if _, ok := edges[inValue]; !ok {
-					edgeids = append(edgeids, inValue)
-				}
-				edges[inValue] = append(edges[inValue], node)
+				nids[inValue][byid[outValue]] = struct{}{}
 				return nil
-			},
-		}
-		if err := sqlgraph.QueryEdges(ctx, mq.driver, _spec); err != nil {
-			return nil, fmt.Errorf(`query edges "writers": %w`, err)
-		}
-		query.Where(artist.IDIn(edgeids...))
-		neighbors, err := query.All(ctx)
+			}
+		})
 		if err != nil {
 			return nil, err
 		}
 		for _, n := range neighbors {
-			nodes, ok := edges[n.ID]
+			nodes, ok := nids[n.ID]
 			if !ok {
 				return nil, fmt.Errorf(`unexpected "writers" node returned %v`, n.ID)
 			}
-			for i := range nodes {
-				nodes[i].Edges.Writers = append(nodes[i].Edges.Writers, n)
+			for kn := range nodes {
+				kn.Edges.Writers = append(kn.Edges.Writers, n)
 			}
 		}
 	}
 
 	if query := mq.withGenres; query != nil {
-		fks := make([]driver.Value, 0, len(nodes))
-		ids := make(map[int]*Movie, len(nodes))
-		for _, node := range nodes {
-			ids[node.ID] = node
-			fks = append(fks, node.ID)
+		edgeids := make([]driver.Value, len(nodes))
+		byid := make(map[int]*Movie)
+		nids := make(map[int]map[*Movie]struct{})
+		for i, node := range nodes {
+			edgeids[i] = node.ID
+			byid[node.ID] = node
 			node.Edges.Genres = []*MovieGenre{}
 		}
-		var (
-			edgeids []int
-			edges   = make(map[int][]*Movie)
-		)
-		_spec := &sqlgraph.EdgeQuerySpec{
-			Edge: &sqlgraph.EdgeSpec{
-				Inverse: true,
-				Table:   movie.GenresTable,
-				Columns: movie.GenresPrimaryKey,
-			},
-			Predicate: func(s *sql.Selector) {
-				s.Where(sql.InValues(movie.GenresPrimaryKey[1], fks...))
-			},
-			ScanValues: func() [2]interface{} {
-				return [2]interface{}{new(sql.NullInt64), new(sql.NullInt64)}
-			},
-			Assign: func(out, in interface{}) error {
-				eout, ok := out.(*sql.NullInt64)
-				if !ok || eout == nil {
-					return fmt.Errorf("unexpected id value for edge-out")
+		query.Where(func(s *sql.Selector) {
+			joinT := sql.Table(movie.GenresTable)
+			s.Join(joinT).On(s.C(moviegenre.FieldID), joinT.C(movie.GenresPrimaryKey[0]))
+			s.Where(sql.InValues(joinT.C(movie.GenresPrimaryKey[1]), edgeids...))
+			columns := s.SelectedColumns()
+			s.Select(joinT.C(movie.GenresPrimaryKey[1]))
+			s.AppendSelect(columns...)
+			s.SetDistinct(false)
+		})
+		neighbors, err := query.sqlAll(ctx, func(_ context.Context, spec *sqlgraph.QuerySpec) {
+			assign := spec.Assign
+			values := spec.ScanValues
+			spec.ScanValues = func(columns []string) ([]interface{}, error) {
+				values, err := values(columns[1:])
+				if err != nil {
+					return nil, err
 				}
-				ein, ok := in.(*sql.NullInt64)
-				if !ok || ein == nil {
-					return fmt.Errorf("unexpected id value for edge-in")
+				return append([]interface{}{new(sql.NullInt64)}, values...), nil
+			}
+			spec.Assign = func(columns []string, values []interface{}) error {
+				outValue := int(values[0].(*sql.NullInt64).Int64)
+				inValue := int(values[1].(*sql.NullInt64).Int64)
+				if nids[inValue] == nil {
+					nids[inValue] = map[*Movie]struct{}{byid[outValue]: struct{}{}}
+					return assign(columns[1:], values[1:])
 				}
-				outValue := int(eout.Int64)
-				inValue := int(ein.Int64)
-				node, ok := ids[outValue]
-				if !ok {
-					return fmt.Errorf("unexpected node id in edges: %v", outValue)
-				}
-				if _, ok := edges[inValue]; !ok {
-					edgeids = append(edgeids, inValue)
-				}
-				edges[inValue] = append(edges[inValue], node)
+				nids[inValue][byid[outValue]] = struct{}{}
 				return nil
-			},
-		}
-		if err := sqlgraph.QueryEdges(ctx, mq.driver, _spec); err != nil {
-			return nil, fmt.Errorf(`query edges "genres": %w`, err)
-		}
-		query.Where(moviegenre.IDIn(edgeids...))
-		neighbors, err := query.All(ctx)
+			}
+		})
 		if err != nil {
 			return nil, err
 		}
 		for _, n := range neighbors {
-			nodes, ok := edges[n.ID]
+			nodes, ok := nids[n.ID]
 			if !ok {
 				return nil, fmt.Errorf(`unexpected "genres" node returned %v`, n.ID)
 			}
-			for i := range nodes {
-				nodes[i].Edges.Genres = append(nodes[i].Edges.Genres, n)
+			for kn := range nodes {
+				kn.Edges.Genres = append(kn.Edges.Genres, n)
 			}
 		}
 	}
 
 	if query := mq.withCountries; query != nil {
-		fks := make([]driver.Value, 0, len(nodes))
-		ids := make(map[int]*Movie, len(nodes))
-		for _, node := range nodes {
-			ids[node.ID] = node
-			fks = append(fks, node.ID)
+		edgeids := make([]driver.Value, len(nodes))
+		byid := make(map[int]*Movie)
+		nids := make(map[int]map[*Movie]struct{})
+		for i, node := range nodes {
+			edgeids[i] = node.ID
+			byid[node.ID] = node
 			node.Edges.Countries = []*Country{}
 		}
-		var (
-			edgeids []int
-			edges   = make(map[int][]*Movie)
-		)
-		_spec := &sqlgraph.EdgeQuerySpec{
-			Edge: &sqlgraph.EdgeSpec{
-				Inverse: true,
-				Table:   movie.CountriesTable,
-				Columns: movie.CountriesPrimaryKey,
-			},
-			Predicate: func(s *sql.Selector) {
-				s.Where(sql.InValues(movie.CountriesPrimaryKey[1], fks...))
-			},
-			ScanValues: func() [2]interface{} {
-				return [2]interface{}{new(sql.NullInt64), new(sql.NullInt64)}
-			},
-			Assign: func(out, in interface{}) error {
-				eout, ok := out.(*sql.NullInt64)
-				if !ok || eout == nil {
-					return fmt.Errorf("unexpected id value for edge-out")
+		query.Where(func(s *sql.Selector) {
+			joinT := sql.Table(movie.CountriesTable)
+			s.Join(joinT).On(s.C(country.FieldID), joinT.C(movie.CountriesPrimaryKey[0]))
+			s.Where(sql.InValues(joinT.C(movie.CountriesPrimaryKey[1]), edgeids...))
+			columns := s.SelectedColumns()
+			s.Select(joinT.C(movie.CountriesPrimaryKey[1]))
+			s.AppendSelect(columns...)
+			s.SetDistinct(false)
+		})
+		neighbors, err := query.sqlAll(ctx, func(_ context.Context, spec *sqlgraph.QuerySpec) {
+			assign := spec.Assign
+			values := spec.ScanValues
+			spec.ScanValues = func(columns []string) ([]interface{}, error) {
+				values, err := values(columns[1:])
+				if err != nil {
+					return nil, err
 				}
-				ein, ok := in.(*sql.NullInt64)
-				if !ok || ein == nil {
-					return fmt.Errorf("unexpected id value for edge-in")
+				return append([]interface{}{new(sql.NullInt64)}, values...), nil
+			}
+			spec.Assign = func(columns []string, values []interface{}) error {
+				outValue := int(values[0].(*sql.NullInt64).Int64)
+				inValue := int(values[1].(*sql.NullInt64).Int64)
+				if nids[inValue] == nil {
+					nids[inValue] = map[*Movie]struct{}{byid[outValue]: struct{}{}}
+					return assign(columns[1:], values[1:])
 				}
-				outValue := int(eout.Int64)
-				inValue := int(ein.Int64)
-				node, ok := ids[outValue]
-				if !ok {
-					return fmt.Errorf("unexpected node id in edges: %v", outValue)
-				}
-				if _, ok := edges[inValue]; !ok {
-					edgeids = append(edgeids, inValue)
-				}
-				edges[inValue] = append(edges[inValue], node)
+				nids[inValue][byid[outValue]] = struct{}{}
 				return nil
-			},
-		}
-		if err := sqlgraph.QueryEdges(ctx, mq.driver, _spec); err != nil {
-			return nil, fmt.Errorf(`query edges "countries": %w`, err)
-		}
-		query.Where(country.IDIn(edgeids...))
-		neighbors, err := query.All(ctx)
+			}
+		})
 		if err != nil {
 			return nil, err
 		}
 		for _, n := range neighbors {
-			nodes, ok := edges[n.ID]
+			nodes, ok := nids[n.ID]
 			if !ok {
 				return nil, fmt.Errorf(`unexpected "countries" node returned %v`, n.ID)
 			}
-			for i := range nodes {
-				nodes[i].Edges.Countries = append(nodes[i].Edges.Countries, n)
+			for kn := range nodes {
+				kn.Edges.Countries = append(kn.Edges.Countries, n)
 			}
 		}
 	}
@@ -1153,6 +1162,7 @@ func (mq *MovieQuery) sqlQuery(ctx context.Context) *sql.Selector {
 // MovieGroupBy is the group-by builder for Movie entities.
 type MovieGroupBy struct {
 	config
+	selector
 	fields []string
 	fns    []AggregateFunc
 	// intermediate query (i.e. traversal path).
@@ -1174,209 +1184,6 @@ func (mgb *MovieGroupBy) Scan(ctx context.Context, v interface{}) error {
 	}
 	mgb.sql = query
 	return mgb.sqlScan(ctx, v)
-}
-
-// ScanX is like Scan, but panics if an error occurs.
-func (mgb *MovieGroupBy) ScanX(ctx context.Context, v interface{}) {
-	if err := mgb.Scan(ctx, v); err != nil {
-		panic(err)
-	}
-}
-
-// Strings returns list of strings from group-by.
-// It is only allowed when executing a group-by query with one field.
-func (mgb *MovieGroupBy) Strings(ctx context.Context) ([]string, error) {
-	if len(mgb.fields) > 1 {
-		return nil, errors.New("ent: MovieGroupBy.Strings is not achievable when grouping more than 1 field")
-	}
-	var v []string
-	if err := mgb.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// StringsX is like Strings, but panics if an error occurs.
-func (mgb *MovieGroupBy) StringsX(ctx context.Context) []string {
-	v, err := mgb.Strings(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// String returns a single string from a group-by query.
-// It is only allowed when executing a group-by query with one field.
-func (mgb *MovieGroupBy) String(ctx context.Context) (_ string, err error) {
-	var v []string
-	if v, err = mgb.Strings(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{movie.Label}
-	default:
-		err = fmt.Errorf("ent: MovieGroupBy.Strings returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// StringX is like String, but panics if an error occurs.
-func (mgb *MovieGroupBy) StringX(ctx context.Context) string {
-	v, err := mgb.String(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Ints returns list of ints from group-by.
-// It is only allowed when executing a group-by query with one field.
-func (mgb *MovieGroupBy) Ints(ctx context.Context) ([]int, error) {
-	if len(mgb.fields) > 1 {
-		return nil, errors.New("ent: MovieGroupBy.Ints is not achievable when grouping more than 1 field")
-	}
-	var v []int
-	if err := mgb.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// IntsX is like Ints, but panics if an error occurs.
-func (mgb *MovieGroupBy) IntsX(ctx context.Context) []int {
-	v, err := mgb.Ints(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Int returns a single int from a group-by query.
-// It is only allowed when executing a group-by query with one field.
-func (mgb *MovieGroupBy) Int(ctx context.Context) (_ int, err error) {
-	var v []int
-	if v, err = mgb.Ints(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{movie.Label}
-	default:
-		err = fmt.Errorf("ent: MovieGroupBy.Ints returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// IntX is like Int, but panics if an error occurs.
-func (mgb *MovieGroupBy) IntX(ctx context.Context) int {
-	v, err := mgb.Int(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Float64s returns list of float64s from group-by.
-// It is only allowed when executing a group-by query with one field.
-func (mgb *MovieGroupBy) Float64s(ctx context.Context) ([]float64, error) {
-	if len(mgb.fields) > 1 {
-		return nil, errors.New("ent: MovieGroupBy.Float64s is not achievable when grouping more than 1 field")
-	}
-	var v []float64
-	if err := mgb.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// Float64sX is like Float64s, but panics if an error occurs.
-func (mgb *MovieGroupBy) Float64sX(ctx context.Context) []float64 {
-	v, err := mgb.Float64s(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Float64 returns a single float64 from a group-by query.
-// It is only allowed when executing a group-by query with one field.
-func (mgb *MovieGroupBy) Float64(ctx context.Context) (_ float64, err error) {
-	var v []float64
-	if v, err = mgb.Float64s(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{movie.Label}
-	default:
-		err = fmt.Errorf("ent: MovieGroupBy.Float64s returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// Float64X is like Float64, but panics if an error occurs.
-func (mgb *MovieGroupBy) Float64X(ctx context.Context) float64 {
-	v, err := mgb.Float64(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Bools returns list of bools from group-by.
-// It is only allowed when executing a group-by query with one field.
-func (mgb *MovieGroupBy) Bools(ctx context.Context) ([]bool, error) {
-	if len(mgb.fields) > 1 {
-		return nil, errors.New("ent: MovieGroupBy.Bools is not achievable when grouping more than 1 field")
-	}
-	var v []bool
-	if err := mgb.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// BoolsX is like Bools, but panics if an error occurs.
-func (mgb *MovieGroupBy) BoolsX(ctx context.Context) []bool {
-	v, err := mgb.Bools(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Bool returns a single bool from a group-by query.
-// It is only allowed when executing a group-by query with one field.
-func (mgb *MovieGroupBy) Bool(ctx context.Context) (_ bool, err error) {
-	var v []bool
-	if v, err = mgb.Bools(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{movie.Label}
-	default:
-		err = fmt.Errorf("ent: MovieGroupBy.Bools returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// BoolX is like Bool, but panics if an error occurs.
-func (mgb *MovieGroupBy) BoolX(ctx context.Context) bool {
-	v, err := mgb.Bool(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
 }
 
 func (mgb *MovieGroupBy) sqlScan(ctx context.Context, v interface{}) error {
@@ -1420,6 +1227,7 @@ func (mgb *MovieGroupBy) sqlQuery() *sql.Selector {
 // MovieSelect is the builder for selecting fields of Movie entities.
 type MovieSelect struct {
 	*MovieQuery
+	selector
 	// intermediate query (i.e. traversal path).
 	sql *sql.Selector
 }
@@ -1431,201 +1239,6 @@ func (ms *MovieSelect) Scan(ctx context.Context, v interface{}) error {
 	}
 	ms.sql = ms.MovieQuery.sqlQuery(ctx)
 	return ms.sqlScan(ctx, v)
-}
-
-// ScanX is like Scan, but panics if an error occurs.
-func (ms *MovieSelect) ScanX(ctx context.Context, v interface{}) {
-	if err := ms.Scan(ctx, v); err != nil {
-		panic(err)
-	}
-}
-
-// Strings returns list of strings from a selector. It is only allowed when selecting one field.
-func (ms *MovieSelect) Strings(ctx context.Context) ([]string, error) {
-	if len(ms.fields) > 1 {
-		return nil, errors.New("ent: MovieSelect.Strings is not achievable when selecting more than 1 field")
-	}
-	var v []string
-	if err := ms.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// StringsX is like Strings, but panics if an error occurs.
-func (ms *MovieSelect) StringsX(ctx context.Context) []string {
-	v, err := ms.Strings(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// String returns a single string from a selector. It is only allowed when selecting one field.
-func (ms *MovieSelect) String(ctx context.Context) (_ string, err error) {
-	var v []string
-	if v, err = ms.Strings(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{movie.Label}
-	default:
-		err = fmt.Errorf("ent: MovieSelect.Strings returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// StringX is like String, but panics if an error occurs.
-func (ms *MovieSelect) StringX(ctx context.Context) string {
-	v, err := ms.String(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Ints returns list of ints from a selector. It is only allowed when selecting one field.
-func (ms *MovieSelect) Ints(ctx context.Context) ([]int, error) {
-	if len(ms.fields) > 1 {
-		return nil, errors.New("ent: MovieSelect.Ints is not achievable when selecting more than 1 field")
-	}
-	var v []int
-	if err := ms.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// IntsX is like Ints, but panics if an error occurs.
-func (ms *MovieSelect) IntsX(ctx context.Context) []int {
-	v, err := ms.Ints(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Int returns a single int from a selector. It is only allowed when selecting one field.
-func (ms *MovieSelect) Int(ctx context.Context) (_ int, err error) {
-	var v []int
-	if v, err = ms.Ints(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{movie.Label}
-	default:
-		err = fmt.Errorf("ent: MovieSelect.Ints returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// IntX is like Int, but panics if an error occurs.
-func (ms *MovieSelect) IntX(ctx context.Context) int {
-	v, err := ms.Int(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Float64s returns list of float64s from a selector. It is only allowed when selecting one field.
-func (ms *MovieSelect) Float64s(ctx context.Context) ([]float64, error) {
-	if len(ms.fields) > 1 {
-		return nil, errors.New("ent: MovieSelect.Float64s is not achievable when selecting more than 1 field")
-	}
-	var v []float64
-	if err := ms.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// Float64sX is like Float64s, but panics if an error occurs.
-func (ms *MovieSelect) Float64sX(ctx context.Context) []float64 {
-	v, err := ms.Float64s(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Float64 returns a single float64 from a selector. It is only allowed when selecting one field.
-func (ms *MovieSelect) Float64(ctx context.Context) (_ float64, err error) {
-	var v []float64
-	if v, err = ms.Float64s(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{movie.Label}
-	default:
-		err = fmt.Errorf("ent: MovieSelect.Float64s returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// Float64X is like Float64, but panics if an error occurs.
-func (ms *MovieSelect) Float64X(ctx context.Context) float64 {
-	v, err := ms.Float64(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Bools returns list of bools from a selector. It is only allowed when selecting one field.
-func (ms *MovieSelect) Bools(ctx context.Context) ([]bool, error) {
-	if len(ms.fields) > 1 {
-		return nil, errors.New("ent: MovieSelect.Bools is not achievable when selecting more than 1 field")
-	}
-	var v []bool
-	if err := ms.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// BoolsX is like Bools, but panics if an error occurs.
-func (ms *MovieSelect) BoolsX(ctx context.Context) []bool {
-	v, err := ms.Bools(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Bool returns a single bool from a selector. It is only allowed when selecting one field.
-func (ms *MovieSelect) Bool(ctx context.Context) (_ bool, err error) {
-	var v []bool
-	if v, err = ms.Bools(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{movie.Label}
-	default:
-		err = fmt.Errorf("ent: MovieSelect.Bools returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// BoolX is like Bool, but panics if an error occurs.
-func (ms *MovieSelect) BoolX(ctx context.Context) bool {
-	v, err := ms.Bool(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
 }
 
 func (ms *MovieSelect) sqlScan(ctx context.Context, v interface{}) error {

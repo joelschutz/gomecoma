@@ -11,6 +11,7 @@ import (
 
 	"github.com/joelschutz/gomecoma/src/ent/artist"
 	"github.com/joelschutz/gomecoma/src/ent/country"
+	"github.com/joelschutz/gomecoma/src/ent/file"
 	"github.com/joelschutz/gomecoma/src/ent/movie"
 	"github.com/joelschutz/gomecoma/src/ent/moviegenre"
 	"github.com/joelschutz/gomecoma/src/ent/picture"
@@ -31,6 +32,7 @@ const (
 	// Node types.
 	TypeArtist     = "Artist"
 	TypeCountry    = "Country"
+	TypeFile       = "File"
 	TypeMovie      = "Movie"
 	TypeMovieGenre = "MovieGenre"
 	TypePicture    = "Picture"
@@ -1449,6 +1451,770 @@ func (m *CountryMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown Country edge %s", name)
 }
 
+// FileMutation represents an operation that mutates the File nodes in the graph.
+type FileMutation struct {
+	config
+	op                     Op
+	typ                    string
+	id                     *int
+	name                   *string
+	_path                  *string
+	_type                  *file.Type
+	external_id            *string
+	external_info_provider *string
+	results                *string
+	synced                 *bool
+	clearedFields          map[string]struct{}
+	movie                  *int
+	clearedmovie           bool
+	done                   bool
+	oldValue               func(context.Context) (*File, error)
+	predicates             []predicate.File
+}
+
+var _ ent.Mutation = (*FileMutation)(nil)
+
+// fileOption allows management of the mutation configuration using functional options.
+type fileOption func(*FileMutation)
+
+// newFileMutation creates new mutation for the File entity.
+func newFileMutation(c config, op Op, opts ...fileOption) *FileMutation {
+	m := &FileMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeFile,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withFileID sets the ID field of the mutation.
+func withFileID(id int) fileOption {
+	return func(m *FileMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *File
+		)
+		m.oldValue = func(ctx context.Context) (*File, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().File.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withFile sets the old File of the mutation.
+func withFile(node *File) fileOption {
+	return func(m *FileMutation) {
+		m.oldValue = func(context.Context) (*File, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m FileMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m FileMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *FileMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *FileMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().File.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetName sets the "name" field.
+func (m *FileMutation) SetName(s string) {
+	m.name = &s
+}
+
+// Name returns the value of the "name" field in the mutation.
+func (m *FileMutation) Name() (r string, exists bool) {
+	v := m.name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldName returns the old "name" field's value of the File entity.
+// If the File object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FileMutation) OldName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldName: %w", err)
+	}
+	return oldValue.Name, nil
+}
+
+// ResetName resets all changes to the "name" field.
+func (m *FileMutation) ResetName() {
+	m.name = nil
+}
+
+// SetPath sets the "path" field.
+func (m *FileMutation) SetPath(s string) {
+	m._path = &s
+}
+
+// Path returns the value of the "path" field in the mutation.
+func (m *FileMutation) Path() (r string, exists bool) {
+	v := m._path
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPath returns the old "path" field's value of the File entity.
+// If the File object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FileMutation) OldPath(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPath is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPath requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPath: %w", err)
+	}
+	return oldValue.Path, nil
+}
+
+// ResetPath resets all changes to the "path" field.
+func (m *FileMutation) ResetPath() {
+	m._path = nil
+}
+
+// SetType sets the "type" field.
+func (m *FileMutation) SetType(f file.Type) {
+	m._type = &f
+}
+
+// GetType returns the value of the "type" field in the mutation.
+func (m *FileMutation) GetType() (r file.Type, exists bool) {
+	v := m._type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldType returns the old "type" field's value of the File entity.
+// If the File object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FileMutation) OldType(ctx context.Context) (v file.Type, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldType: %w", err)
+	}
+	return oldValue.Type, nil
+}
+
+// ResetType resets all changes to the "type" field.
+func (m *FileMutation) ResetType() {
+	m._type = nil
+}
+
+// SetExternalID sets the "external_id" field.
+func (m *FileMutation) SetExternalID(s string) {
+	m.external_id = &s
+}
+
+// ExternalID returns the value of the "external_id" field in the mutation.
+func (m *FileMutation) ExternalID() (r string, exists bool) {
+	v := m.external_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExternalID returns the old "external_id" field's value of the File entity.
+// If the File object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FileMutation) OldExternalID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExternalID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExternalID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExternalID: %w", err)
+	}
+	return oldValue.ExternalID, nil
+}
+
+// ClearExternalID clears the value of the "external_id" field.
+func (m *FileMutation) ClearExternalID() {
+	m.external_id = nil
+	m.clearedFields[file.FieldExternalID] = struct{}{}
+}
+
+// ExternalIDCleared returns if the "external_id" field was cleared in this mutation.
+func (m *FileMutation) ExternalIDCleared() bool {
+	_, ok := m.clearedFields[file.FieldExternalID]
+	return ok
+}
+
+// ResetExternalID resets all changes to the "external_id" field.
+func (m *FileMutation) ResetExternalID() {
+	m.external_id = nil
+	delete(m.clearedFields, file.FieldExternalID)
+}
+
+// SetExternalInfoProvider sets the "external_info_provider" field.
+func (m *FileMutation) SetExternalInfoProvider(s string) {
+	m.external_info_provider = &s
+}
+
+// ExternalInfoProvider returns the value of the "external_info_provider" field in the mutation.
+func (m *FileMutation) ExternalInfoProvider() (r string, exists bool) {
+	v := m.external_info_provider
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExternalInfoProvider returns the old "external_info_provider" field's value of the File entity.
+// If the File object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FileMutation) OldExternalInfoProvider(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExternalInfoProvider is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExternalInfoProvider requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExternalInfoProvider: %w", err)
+	}
+	return oldValue.ExternalInfoProvider, nil
+}
+
+// ClearExternalInfoProvider clears the value of the "external_info_provider" field.
+func (m *FileMutation) ClearExternalInfoProvider() {
+	m.external_info_provider = nil
+	m.clearedFields[file.FieldExternalInfoProvider] = struct{}{}
+}
+
+// ExternalInfoProviderCleared returns if the "external_info_provider" field was cleared in this mutation.
+func (m *FileMutation) ExternalInfoProviderCleared() bool {
+	_, ok := m.clearedFields[file.FieldExternalInfoProvider]
+	return ok
+}
+
+// ResetExternalInfoProvider resets all changes to the "external_info_provider" field.
+func (m *FileMutation) ResetExternalInfoProvider() {
+	m.external_info_provider = nil
+	delete(m.clearedFields, file.FieldExternalInfoProvider)
+}
+
+// SetResults sets the "results" field.
+func (m *FileMutation) SetResults(s string) {
+	m.results = &s
+}
+
+// Results returns the value of the "results" field in the mutation.
+func (m *FileMutation) Results() (r string, exists bool) {
+	v := m.results
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldResults returns the old "results" field's value of the File entity.
+// If the File object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FileMutation) OldResults(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldResults is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldResults requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldResults: %w", err)
+	}
+	return oldValue.Results, nil
+}
+
+// ClearResults clears the value of the "results" field.
+func (m *FileMutation) ClearResults() {
+	m.results = nil
+	m.clearedFields[file.FieldResults] = struct{}{}
+}
+
+// ResultsCleared returns if the "results" field was cleared in this mutation.
+func (m *FileMutation) ResultsCleared() bool {
+	_, ok := m.clearedFields[file.FieldResults]
+	return ok
+}
+
+// ResetResults resets all changes to the "results" field.
+func (m *FileMutation) ResetResults() {
+	m.results = nil
+	delete(m.clearedFields, file.FieldResults)
+}
+
+// SetSynced sets the "synced" field.
+func (m *FileMutation) SetSynced(b bool) {
+	m.synced = &b
+}
+
+// Synced returns the value of the "synced" field in the mutation.
+func (m *FileMutation) Synced() (r bool, exists bool) {
+	v := m.synced
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSynced returns the old "synced" field's value of the File entity.
+// If the File object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FileMutation) OldSynced(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSynced is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSynced requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSynced: %w", err)
+	}
+	return oldValue.Synced, nil
+}
+
+// ResetSynced resets all changes to the "synced" field.
+func (m *FileMutation) ResetSynced() {
+	m.synced = nil
+}
+
+// SetMovieID sets the "movie" edge to the Movie entity by id.
+func (m *FileMutation) SetMovieID(id int) {
+	m.movie = &id
+}
+
+// ClearMovie clears the "movie" edge to the Movie entity.
+func (m *FileMutation) ClearMovie() {
+	m.clearedmovie = true
+}
+
+// MovieCleared reports if the "movie" edge to the Movie entity was cleared.
+func (m *FileMutation) MovieCleared() bool {
+	return m.clearedmovie
+}
+
+// MovieID returns the "movie" edge ID in the mutation.
+func (m *FileMutation) MovieID() (id int, exists bool) {
+	if m.movie != nil {
+		return *m.movie, true
+	}
+	return
+}
+
+// MovieIDs returns the "movie" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// MovieID instead. It exists only for internal usage by the builders.
+func (m *FileMutation) MovieIDs() (ids []int) {
+	if id := m.movie; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetMovie resets all changes to the "movie" edge.
+func (m *FileMutation) ResetMovie() {
+	m.movie = nil
+	m.clearedmovie = false
+}
+
+// Where appends a list predicates to the FileMutation builder.
+func (m *FileMutation) Where(ps ...predicate.File) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// Op returns the operation name.
+func (m *FileMutation) Op() Op {
+	return m.op
+}
+
+// Type returns the node type of this mutation (File).
+func (m *FileMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *FileMutation) Fields() []string {
+	fields := make([]string, 0, 7)
+	if m.name != nil {
+		fields = append(fields, file.FieldName)
+	}
+	if m._path != nil {
+		fields = append(fields, file.FieldPath)
+	}
+	if m._type != nil {
+		fields = append(fields, file.FieldType)
+	}
+	if m.external_id != nil {
+		fields = append(fields, file.FieldExternalID)
+	}
+	if m.external_info_provider != nil {
+		fields = append(fields, file.FieldExternalInfoProvider)
+	}
+	if m.results != nil {
+		fields = append(fields, file.FieldResults)
+	}
+	if m.synced != nil {
+		fields = append(fields, file.FieldSynced)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *FileMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case file.FieldName:
+		return m.Name()
+	case file.FieldPath:
+		return m.Path()
+	case file.FieldType:
+		return m.GetType()
+	case file.FieldExternalID:
+		return m.ExternalID()
+	case file.FieldExternalInfoProvider:
+		return m.ExternalInfoProvider()
+	case file.FieldResults:
+		return m.Results()
+	case file.FieldSynced:
+		return m.Synced()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *FileMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case file.FieldName:
+		return m.OldName(ctx)
+	case file.FieldPath:
+		return m.OldPath(ctx)
+	case file.FieldType:
+		return m.OldType(ctx)
+	case file.FieldExternalID:
+		return m.OldExternalID(ctx)
+	case file.FieldExternalInfoProvider:
+		return m.OldExternalInfoProvider(ctx)
+	case file.FieldResults:
+		return m.OldResults(ctx)
+	case file.FieldSynced:
+		return m.OldSynced(ctx)
+	}
+	return nil, fmt.Errorf("unknown File field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *FileMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case file.FieldName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetName(v)
+		return nil
+	case file.FieldPath:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPath(v)
+		return nil
+	case file.FieldType:
+		v, ok := value.(file.Type)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetType(v)
+		return nil
+	case file.FieldExternalID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExternalID(v)
+		return nil
+	case file.FieldExternalInfoProvider:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExternalInfoProvider(v)
+		return nil
+	case file.FieldResults:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetResults(v)
+		return nil
+	case file.FieldSynced:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSynced(v)
+		return nil
+	}
+	return fmt.Errorf("unknown File field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *FileMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *FileMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *FileMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown File numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *FileMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(file.FieldExternalID) {
+		fields = append(fields, file.FieldExternalID)
+	}
+	if m.FieldCleared(file.FieldExternalInfoProvider) {
+		fields = append(fields, file.FieldExternalInfoProvider)
+	}
+	if m.FieldCleared(file.FieldResults) {
+		fields = append(fields, file.FieldResults)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *FileMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *FileMutation) ClearField(name string) error {
+	switch name {
+	case file.FieldExternalID:
+		m.ClearExternalID()
+		return nil
+	case file.FieldExternalInfoProvider:
+		m.ClearExternalInfoProvider()
+		return nil
+	case file.FieldResults:
+		m.ClearResults()
+		return nil
+	}
+	return fmt.Errorf("unknown File nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *FileMutation) ResetField(name string) error {
+	switch name {
+	case file.FieldName:
+		m.ResetName()
+		return nil
+	case file.FieldPath:
+		m.ResetPath()
+		return nil
+	case file.FieldType:
+		m.ResetType()
+		return nil
+	case file.FieldExternalID:
+		m.ResetExternalID()
+		return nil
+	case file.FieldExternalInfoProvider:
+		m.ResetExternalInfoProvider()
+		return nil
+	case file.FieldResults:
+		m.ResetResults()
+		return nil
+	case file.FieldSynced:
+		m.ResetSynced()
+		return nil
+	}
+	return fmt.Errorf("unknown File field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *FileMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.movie != nil {
+		edges = append(edges, file.EdgeMovie)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *FileMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case file.EdgeMovie:
+		if id := m.movie; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *FileMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *FileMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	}
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *FileMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.clearedmovie {
+		edges = append(edges, file.EdgeMovie)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *FileMutation) EdgeCleared(name string) bool {
+	switch name {
+	case file.EdgeMovie:
+		return m.clearedmovie
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *FileMutation) ClearEdge(name string) error {
+	switch name {
+	case file.EdgeMovie:
+		m.ClearMovie()
+		return nil
+	}
+	return fmt.Errorf("unknown File unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *FileMutation) ResetEdge(name string) error {
+	switch name {
+	case file.EdgeMovie:
+		m.ResetMovie()
+		return nil
+	}
+	return fmt.Errorf("unknown File edge %s", name)
+}
+
 // MovieMutation represents an operation that mutates the Movie nodes in the graph.
 type MovieMutation struct {
 	config
@@ -1457,13 +2223,14 @@ type MovieMutation struct {
 	id               *int
 	title            *string
 	original_title   *string
-	languages        *[]string
 	release_date     *time.Time
 	plot             *string
 	duration         *int
 	addduration      *int
 	watched          *bool
 	clearedFields    map[string]struct{}
+	file             *int
+	clearedfile      bool
 	ratings          map[int]struct{}
 	removedratings   map[int]struct{}
 	clearedratings   bool
@@ -1675,55 +2442,6 @@ func (m *MovieMutation) ResetOriginalTitle() {
 	delete(m.clearedFields, movie.FieldOriginalTitle)
 }
 
-// SetLanguages sets the "languages" field.
-func (m *MovieMutation) SetLanguages(s []string) {
-	m.languages = &s
-}
-
-// Languages returns the value of the "languages" field in the mutation.
-func (m *MovieMutation) Languages() (r []string, exists bool) {
-	v := m.languages
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldLanguages returns the old "languages" field's value of the Movie entity.
-// If the Movie object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *MovieMutation) OldLanguages(ctx context.Context) (v []string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldLanguages is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldLanguages requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldLanguages: %w", err)
-	}
-	return oldValue.Languages, nil
-}
-
-// ClearLanguages clears the value of the "languages" field.
-func (m *MovieMutation) ClearLanguages() {
-	m.languages = nil
-	m.clearedFields[movie.FieldLanguages] = struct{}{}
-}
-
-// LanguagesCleared returns if the "languages" field was cleared in this mutation.
-func (m *MovieMutation) LanguagesCleared() bool {
-	_, ok := m.clearedFields[movie.FieldLanguages]
-	return ok
-}
-
-// ResetLanguages resets all changes to the "languages" field.
-func (m *MovieMutation) ResetLanguages() {
-	m.languages = nil
-	delete(m.clearedFields, movie.FieldLanguages)
-}
-
 // SetReleaseDate sets the "release_date" field.
 func (m *MovieMutation) SetReleaseDate(t time.Time) {
 	m.release_date = &t
@@ -1926,6 +2644,45 @@ func (m *MovieMutation) OldWatched(ctx context.Context) (v bool, err error) {
 // ResetWatched resets all changes to the "watched" field.
 func (m *MovieMutation) ResetWatched() {
 	m.watched = nil
+}
+
+// SetFileID sets the "file" edge to the File entity by id.
+func (m *MovieMutation) SetFileID(id int) {
+	m.file = &id
+}
+
+// ClearFile clears the "file" edge to the File entity.
+func (m *MovieMutation) ClearFile() {
+	m.clearedfile = true
+}
+
+// FileCleared reports if the "file" edge to the File entity was cleared.
+func (m *MovieMutation) FileCleared() bool {
+	return m.clearedfile
+}
+
+// FileID returns the "file" edge ID in the mutation.
+func (m *MovieMutation) FileID() (id int, exists bool) {
+	if m.file != nil {
+		return *m.file, true
+	}
+	return
+}
+
+// FileIDs returns the "file" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// FileID instead. It exists only for internal usage by the builders.
+func (m *MovieMutation) FileIDs() (ids []int) {
+	if id := m.file; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetFile resets all changes to the "file" edge.
+func (m *MovieMutation) ResetFile() {
+	m.file = nil
+	m.clearedfile = false
 }
 
 // AddRatingIDs adds the "ratings" edge to the Rating entity by ids.
@@ -2364,15 +3121,12 @@ func (m *MovieMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *MovieMutation) Fields() []string {
-	fields := make([]string, 0, 7)
+	fields := make([]string, 0, 6)
 	if m.title != nil {
 		fields = append(fields, movie.FieldTitle)
 	}
 	if m.original_title != nil {
 		fields = append(fields, movie.FieldOriginalTitle)
-	}
-	if m.languages != nil {
-		fields = append(fields, movie.FieldLanguages)
 	}
 	if m.release_date != nil {
 		fields = append(fields, movie.FieldReleaseDate)
@@ -2398,8 +3152,6 @@ func (m *MovieMutation) Field(name string) (ent.Value, bool) {
 		return m.Title()
 	case movie.FieldOriginalTitle:
 		return m.OriginalTitle()
-	case movie.FieldLanguages:
-		return m.Languages()
 	case movie.FieldReleaseDate:
 		return m.ReleaseDate()
 	case movie.FieldPlot:
@@ -2421,8 +3173,6 @@ func (m *MovieMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldTitle(ctx)
 	case movie.FieldOriginalTitle:
 		return m.OldOriginalTitle(ctx)
-	case movie.FieldLanguages:
-		return m.OldLanguages(ctx)
 	case movie.FieldReleaseDate:
 		return m.OldReleaseDate(ctx)
 	case movie.FieldPlot:
@@ -2453,13 +3203,6 @@ func (m *MovieMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetOriginalTitle(v)
-		return nil
-	case movie.FieldLanguages:
-		v, ok := value.([]string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetLanguages(v)
 		return nil
 	case movie.FieldReleaseDate:
 		v, ok := value.(time.Time)
@@ -2537,9 +3280,6 @@ func (m *MovieMutation) ClearedFields() []string {
 	if m.FieldCleared(movie.FieldOriginalTitle) {
 		fields = append(fields, movie.FieldOriginalTitle)
 	}
-	if m.FieldCleared(movie.FieldLanguages) {
-		fields = append(fields, movie.FieldLanguages)
-	}
 	if m.FieldCleared(movie.FieldReleaseDate) {
 		fields = append(fields, movie.FieldReleaseDate)
 	}
@@ -2566,9 +3306,6 @@ func (m *MovieMutation) ClearField(name string) error {
 	case movie.FieldOriginalTitle:
 		m.ClearOriginalTitle()
 		return nil
-	case movie.FieldLanguages:
-		m.ClearLanguages()
-		return nil
 	case movie.FieldReleaseDate:
 		m.ClearReleaseDate()
 		return nil
@@ -2592,9 +3329,6 @@ func (m *MovieMutation) ResetField(name string) error {
 	case movie.FieldOriginalTitle:
 		m.ResetOriginalTitle()
 		return nil
-	case movie.FieldLanguages:
-		m.ResetLanguages()
-		return nil
 	case movie.FieldReleaseDate:
 		m.ResetReleaseDate()
 		return nil
@@ -2613,7 +3347,10 @@ func (m *MovieMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *MovieMutation) AddedEdges() []string {
-	edges := make([]string, 0, 8)
+	edges := make([]string, 0, 9)
+	if m.file != nil {
+		edges = append(edges, movie.EdgeFile)
+	}
 	if m.ratings != nil {
 		edges = append(edges, movie.EdgeRatings)
 	}
@@ -2645,6 +3382,10 @@ func (m *MovieMutation) AddedEdges() []string {
 // name in this mutation.
 func (m *MovieMutation) AddedIDs(name string) []ent.Value {
 	switch name {
+	case movie.EdgeFile:
+		if id := m.file; id != nil {
+			return []ent.Value{*id}
+		}
 	case movie.EdgeRatings:
 		ids := make([]ent.Value, 0, len(m.ratings))
 		for id := range m.ratings {
@@ -2697,7 +3438,7 @@ func (m *MovieMutation) AddedIDs(name string) []ent.Value {
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *MovieMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 8)
+	edges := make([]string, 0, 9)
 	if m.removedratings != nil {
 		edges = append(edges, movie.EdgeRatings)
 	}
@@ -2774,7 +3515,10 @@ func (m *MovieMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *MovieMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 8)
+	edges := make([]string, 0, 9)
+	if m.clearedfile {
+		edges = append(edges, movie.EdgeFile)
+	}
 	if m.clearedratings {
 		edges = append(edges, movie.EdgeRatings)
 	}
@@ -2806,6 +3550,8 @@ func (m *MovieMutation) ClearedEdges() []string {
 // was cleared in this mutation.
 func (m *MovieMutation) EdgeCleared(name string) bool {
 	switch name {
+	case movie.EdgeFile:
+		return m.clearedfile
 	case movie.EdgeRatings:
 		return m.clearedratings
 	case movie.EdgePoster:
@@ -2830,6 +3576,9 @@ func (m *MovieMutation) EdgeCleared(name string) bool {
 // if that edge is not defined in the schema.
 func (m *MovieMutation) ClearEdge(name string) error {
 	switch name {
+	case movie.EdgeFile:
+		m.ClearFile()
+		return nil
 	case movie.EdgePoster:
 		m.ClearPoster()
 		return nil
@@ -2841,6 +3590,9 @@ func (m *MovieMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *MovieMutation) ResetEdge(name string) error {
 	switch name {
+	case movie.EdgeFile:
+		m.ResetFile()
+		return nil
 	case movie.EdgeRatings:
 		m.ResetRatings()
 		return nil

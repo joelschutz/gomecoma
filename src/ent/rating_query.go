@@ -4,7 +4,6 @@ package ent
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math"
 
@@ -107,7 +106,7 @@ func (rq *RatingQuery) FirstIDX(ctx context.Context) int {
 }
 
 // Only returns a single Rating entity found by the query, ensuring it only returns one.
-// Returns a *NotSingularError when exactly one Rating entity is not found.
+// Returns a *NotSingularError when more than one Rating entity is found.
 // Returns a *NotFoundError when no Rating entities are found.
 func (rq *RatingQuery) Only(ctx context.Context) (*Rating, error) {
 	nodes, err := rq.Limit(2).All(ctx)
@@ -134,7 +133,7 @@ func (rq *RatingQuery) OnlyX(ctx context.Context) *Rating {
 }
 
 // OnlyID is like Only, but returns the only Rating ID in the query.
-// Returns a *NotSingularError when exactly one Rating ID is not found.
+// Returns a *NotSingularError when more than one Rating ID is found.
 // Returns a *NotFoundError when no entities are found.
 func (rq *RatingQuery) OnlyID(ctx context.Context) (id int, err error) {
 	var ids []int
@@ -243,8 +242,9 @@ func (rq *RatingQuery) Clone() *RatingQuery {
 		order:      append([]OrderFunc{}, rq.order...),
 		predicates: append([]predicate.Rating{}, rq.predicates...),
 		// clone intermediate query.
-		sql:  rq.sql.Clone(),
-		path: rq.path,
+		sql:    rq.sql.Clone(),
+		path:   rq.path,
+		unique: rq.unique,
 	}
 }
 
@@ -264,15 +264,17 @@ func (rq *RatingQuery) Clone() *RatingQuery {
 //		Scan(ctx, &v)
 //
 func (rq *RatingQuery) GroupBy(field string, fields ...string) *RatingGroupBy {
-	group := &RatingGroupBy{config: rq.config}
-	group.fields = append([]string{field}, fields...)
-	group.path = func(ctx context.Context) (prev *sql.Selector, err error) {
+	grbuild := &RatingGroupBy{config: rq.config}
+	grbuild.fields = append([]string{field}, fields...)
+	grbuild.path = func(ctx context.Context) (prev *sql.Selector, err error) {
 		if err := rq.prepareQuery(ctx); err != nil {
 			return nil, err
 		}
 		return rq.sqlQuery(ctx), nil
 	}
-	return group
+	grbuild.label = rating.Label
+	grbuild.flds, grbuild.scan = &grbuild.fields, grbuild.Scan
+	return grbuild
 }
 
 // Select allows the selection one or more fields/columns for the given query,
@@ -290,7 +292,10 @@ func (rq *RatingQuery) GroupBy(field string, fields ...string) *RatingGroupBy {
 //
 func (rq *RatingQuery) Select(fields ...string) *RatingSelect {
 	rq.fields = append(rq.fields, fields...)
-	return &RatingSelect{RatingQuery: rq}
+	selbuild := &RatingSelect{RatingQuery: rq}
+	selbuild.label = rating.Label
+	selbuild.flds, selbuild.scan = &rq.fields, selbuild.Scan
+	return selbuild
 }
 
 func (rq *RatingQuery) prepareQuery(ctx context.Context) error {
@@ -309,7 +314,7 @@ func (rq *RatingQuery) prepareQuery(ctx context.Context) error {
 	return nil
 }
 
-func (rq *RatingQuery) sqlAll(ctx context.Context) ([]*Rating, error) {
+func (rq *RatingQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Rating, error) {
 	var (
 		nodes   = []*Rating{}
 		withFKs = rq.withFKs
@@ -319,16 +324,15 @@ func (rq *RatingQuery) sqlAll(ctx context.Context) ([]*Rating, error) {
 		_spec.Node.Columns = append(_spec.Node.Columns, rating.ForeignKeys...)
 	}
 	_spec.ScanValues = func(columns []string) ([]interface{}, error) {
-		node := &Rating{config: rq.config}
-		nodes = append(nodes, node)
-		return node.scanValues(columns)
+		return (*Rating).scanValues(nil, columns)
 	}
 	_spec.Assign = func(columns []string, values []interface{}) error {
-		if len(nodes) == 0 {
-			return fmt.Errorf("ent: Assign called without calling ScanValues")
-		}
-		node := nodes[len(nodes)-1]
+		node := &Rating{config: rq.config}
+		nodes = append(nodes, node)
 		return node.assignValues(columns, values)
+	}
+	for i := range hooks {
+		hooks[i](ctx, _spec)
 	}
 	if err := sqlgraph.QueryNodes(ctx, rq.driver, _spec); err != nil {
 		return nil, err
@@ -439,6 +443,7 @@ func (rq *RatingQuery) sqlQuery(ctx context.Context) *sql.Selector {
 // RatingGroupBy is the group-by builder for Rating entities.
 type RatingGroupBy struct {
 	config
+	selector
 	fields []string
 	fns    []AggregateFunc
 	// intermediate query (i.e. traversal path).
@@ -460,209 +465,6 @@ func (rgb *RatingGroupBy) Scan(ctx context.Context, v interface{}) error {
 	}
 	rgb.sql = query
 	return rgb.sqlScan(ctx, v)
-}
-
-// ScanX is like Scan, but panics if an error occurs.
-func (rgb *RatingGroupBy) ScanX(ctx context.Context, v interface{}) {
-	if err := rgb.Scan(ctx, v); err != nil {
-		panic(err)
-	}
-}
-
-// Strings returns list of strings from group-by.
-// It is only allowed when executing a group-by query with one field.
-func (rgb *RatingGroupBy) Strings(ctx context.Context) ([]string, error) {
-	if len(rgb.fields) > 1 {
-		return nil, errors.New("ent: RatingGroupBy.Strings is not achievable when grouping more than 1 field")
-	}
-	var v []string
-	if err := rgb.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// StringsX is like Strings, but panics if an error occurs.
-func (rgb *RatingGroupBy) StringsX(ctx context.Context) []string {
-	v, err := rgb.Strings(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// String returns a single string from a group-by query.
-// It is only allowed when executing a group-by query with one field.
-func (rgb *RatingGroupBy) String(ctx context.Context) (_ string, err error) {
-	var v []string
-	if v, err = rgb.Strings(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{rating.Label}
-	default:
-		err = fmt.Errorf("ent: RatingGroupBy.Strings returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// StringX is like String, but panics if an error occurs.
-func (rgb *RatingGroupBy) StringX(ctx context.Context) string {
-	v, err := rgb.String(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Ints returns list of ints from group-by.
-// It is only allowed when executing a group-by query with one field.
-func (rgb *RatingGroupBy) Ints(ctx context.Context) ([]int, error) {
-	if len(rgb.fields) > 1 {
-		return nil, errors.New("ent: RatingGroupBy.Ints is not achievable when grouping more than 1 field")
-	}
-	var v []int
-	if err := rgb.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// IntsX is like Ints, but panics if an error occurs.
-func (rgb *RatingGroupBy) IntsX(ctx context.Context) []int {
-	v, err := rgb.Ints(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Int returns a single int from a group-by query.
-// It is only allowed when executing a group-by query with one field.
-func (rgb *RatingGroupBy) Int(ctx context.Context) (_ int, err error) {
-	var v []int
-	if v, err = rgb.Ints(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{rating.Label}
-	default:
-		err = fmt.Errorf("ent: RatingGroupBy.Ints returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// IntX is like Int, but panics if an error occurs.
-func (rgb *RatingGroupBy) IntX(ctx context.Context) int {
-	v, err := rgb.Int(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Float64s returns list of float64s from group-by.
-// It is only allowed when executing a group-by query with one field.
-func (rgb *RatingGroupBy) Float64s(ctx context.Context) ([]float64, error) {
-	if len(rgb.fields) > 1 {
-		return nil, errors.New("ent: RatingGroupBy.Float64s is not achievable when grouping more than 1 field")
-	}
-	var v []float64
-	if err := rgb.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// Float64sX is like Float64s, but panics if an error occurs.
-func (rgb *RatingGroupBy) Float64sX(ctx context.Context) []float64 {
-	v, err := rgb.Float64s(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Float64 returns a single float64 from a group-by query.
-// It is only allowed when executing a group-by query with one field.
-func (rgb *RatingGroupBy) Float64(ctx context.Context) (_ float64, err error) {
-	var v []float64
-	if v, err = rgb.Float64s(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{rating.Label}
-	default:
-		err = fmt.Errorf("ent: RatingGroupBy.Float64s returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// Float64X is like Float64, but panics if an error occurs.
-func (rgb *RatingGroupBy) Float64X(ctx context.Context) float64 {
-	v, err := rgb.Float64(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Bools returns list of bools from group-by.
-// It is only allowed when executing a group-by query with one field.
-func (rgb *RatingGroupBy) Bools(ctx context.Context) ([]bool, error) {
-	if len(rgb.fields) > 1 {
-		return nil, errors.New("ent: RatingGroupBy.Bools is not achievable when grouping more than 1 field")
-	}
-	var v []bool
-	if err := rgb.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// BoolsX is like Bools, but panics if an error occurs.
-func (rgb *RatingGroupBy) BoolsX(ctx context.Context) []bool {
-	v, err := rgb.Bools(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Bool returns a single bool from a group-by query.
-// It is only allowed when executing a group-by query with one field.
-func (rgb *RatingGroupBy) Bool(ctx context.Context) (_ bool, err error) {
-	var v []bool
-	if v, err = rgb.Bools(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{rating.Label}
-	default:
-		err = fmt.Errorf("ent: RatingGroupBy.Bools returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// BoolX is like Bool, but panics if an error occurs.
-func (rgb *RatingGroupBy) BoolX(ctx context.Context) bool {
-	v, err := rgb.Bool(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
 }
 
 func (rgb *RatingGroupBy) sqlScan(ctx context.Context, v interface{}) error {
@@ -706,6 +508,7 @@ func (rgb *RatingGroupBy) sqlQuery() *sql.Selector {
 // RatingSelect is the builder for selecting fields of Rating entities.
 type RatingSelect struct {
 	*RatingQuery
+	selector
 	// intermediate query (i.e. traversal path).
 	sql *sql.Selector
 }
@@ -717,201 +520,6 @@ func (rs *RatingSelect) Scan(ctx context.Context, v interface{}) error {
 	}
 	rs.sql = rs.RatingQuery.sqlQuery(ctx)
 	return rs.sqlScan(ctx, v)
-}
-
-// ScanX is like Scan, but panics if an error occurs.
-func (rs *RatingSelect) ScanX(ctx context.Context, v interface{}) {
-	if err := rs.Scan(ctx, v); err != nil {
-		panic(err)
-	}
-}
-
-// Strings returns list of strings from a selector. It is only allowed when selecting one field.
-func (rs *RatingSelect) Strings(ctx context.Context) ([]string, error) {
-	if len(rs.fields) > 1 {
-		return nil, errors.New("ent: RatingSelect.Strings is not achievable when selecting more than 1 field")
-	}
-	var v []string
-	if err := rs.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// StringsX is like Strings, but panics if an error occurs.
-func (rs *RatingSelect) StringsX(ctx context.Context) []string {
-	v, err := rs.Strings(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// String returns a single string from a selector. It is only allowed when selecting one field.
-func (rs *RatingSelect) String(ctx context.Context) (_ string, err error) {
-	var v []string
-	if v, err = rs.Strings(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{rating.Label}
-	default:
-		err = fmt.Errorf("ent: RatingSelect.Strings returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// StringX is like String, but panics if an error occurs.
-func (rs *RatingSelect) StringX(ctx context.Context) string {
-	v, err := rs.String(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Ints returns list of ints from a selector. It is only allowed when selecting one field.
-func (rs *RatingSelect) Ints(ctx context.Context) ([]int, error) {
-	if len(rs.fields) > 1 {
-		return nil, errors.New("ent: RatingSelect.Ints is not achievable when selecting more than 1 field")
-	}
-	var v []int
-	if err := rs.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// IntsX is like Ints, but panics if an error occurs.
-func (rs *RatingSelect) IntsX(ctx context.Context) []int {
-	v, err := rs.Ints(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Int returns a single int from a selector. It is only allowed when selecting one field.
-func (rs *RatingSelect) Int(ctx context.Context) (_ int, err error) {
-	var v []int
-	if v, err = rs.Ints(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{rating.Label}
-	default:
-		err = fmt.Errorf("ent: RatingSelect.Ints returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// IntX is like Int, but panics if an error occurs.
-func (rs *RatingSelect) IntX(ctx context.Context) int {
-	v, err := rs.Int(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Float64s returns list of float64s from a selector. It is only allowed when selecting one field.
-func (rs *RatingSelect) Float64s(ctx context.Context) ([]float64, error) {
-	if len(rs.fields) > 1 {
-		return nil, errors.New("ent: RatingSelect.Float64s is not achievable when selecting more than 1 field")
-	}
-	var v []float64
-	if err := rs.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// Float64sX is like Float64s, but panics if an error occurs.
-func (rs *RatingSelect) Float64sX(ctx context.Context) []float64 {
-	v, err := rs.Float64s(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Float64 returns a single float64 from a selector. It is only allowed when selecting one field.
-func (rs *RatingSelect) Float64(ctx context.Context) (_ float64, err error) {
-	var v []float64
-	if v, err = rs.Float64s(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{rating.Label}
-	default:
-		err = fmt.Errorf("ent: RatingSelect.Float64s returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// Float64X is like Float64, but panics if an error occurs.
-func (rs *RatingSelect) Float64X(ctx context.Context) float64 {
-	v, err := rs.Float64(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Bools returns list of bools from a selector. It is only allowed when selecting one field.
-func (rs *RatingSelect) Bools(ctx context.Context) ([]bool, error) {
-	if len(rs.fields) > 1 {
-		return nil, errors.New("ent: RatingSelect.Bools is not achievable when selecting more than 1 field")
-	}
-	var v []bool
-	if err := rs.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// BoolsX is like Bools, but panics if an error occurs.
-func (rs *RatingSelect) BoolsX(ctx context.Context) []bool {
-	v, err := rs.Bools(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Bool returns a single bool from a selector. It is only allowed when selecting one field.
-func (rs *RatingSelect) Bool(ctx context.Context) (_ bool, err error) {
-	var v []bool
-	if v, err = rs.Bools(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{rating.Label}
-	default:
-		err = fmt.Errorf("ent: RatingSelect.Bools returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// BoolX is like Bool, but panics if an error occurs.
-func (rs *RatingSelect) BoolX(ctx context.Context) bool {
-	v, err := rs.Bool(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
 }
 
 func (rs *RatingSelect) sqlScan(ctx context.Context, v interface{}) error {

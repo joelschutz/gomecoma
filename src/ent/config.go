@@ -26,6 +26,7 @@ type config struct {
 type hooks struct {
 	Artist     []ent.Hook
 	Country    []ent.Hook
+	File       []ent.Hook
 	Movie      []ent.Hook
 	MovieGenre []ent.Hook
 	Picture    []ent.Hook

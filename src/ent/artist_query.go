@@ -5,7 +5,6 @@ package ent
 import (
 	"context"
 	"database/sql/driver"
-	"errors"
 	"fmt"
 	"math"
 
@@ -250,7 +249,7 @@ func (aq *ArtistQuery) FirstIDX(ctx context.Context) int {
 }
 
 // Only returns a single Artist entity found by the query, ensuring it only returns one.
-// Returns a *NotSingularError when exactly one Artist entity is not found.
+// Returns a *NotSingularError when more than one Artist entity is found.
 // Returns a *NotFoundError when no Artist entities are found.
 func (aq *ArtistQuery) Only(ctx context.Context) (*Artist, error) {
 	nodes, err := aq.Limit(2).All(ctx)
@@ -277,7 +276,7 @@ func (aq *ArtistQuery) OnlyX(ctx context.Context) *Artist {
 }
 
 // OnlyID is like Only, but returns the only Artist ID in the query.
-// Returns a *NotSingularError when exactly one Artist ID is not found.
+// Returns a *NotSingularError when more than one Artist ID is found.
 // Returns a *NotFoundError when no entities are found.
 func (aq *ArtistQuery) OnlyID(ctx context.Context) (id int, err error) {
 	var ids []int
@@ -392,8 +391,9 @@ func (aq *ArtistQuery) Clone() *ArtistQuery {
 		withWrote:          aq.withWrote.Clone(),
 		withCountries:      aq.withCountries.Clone(),
 		// clone intermediate query.
-		sql:  aq.sql.Clone(),
-		path: aq.path,
+		sql:    aq.sql.Clone(),
+		path:   aq.path,
+		unique: aq.unique,
 	}
 }
 
@@ -479,15 +479,17 @@ func (aq *ArtistQuery) WithCountries(opts ...func(*CountryQuery)) *ArtistQuery {
 //		Scan(ctx, &v)
 //
 func (aq *ArtistQuery) GroupBy(field string, fields ...string) *ArtistGroupBy {
-	group := &ArtistGroupBy{config: aq.config}
-	group.fields = append([]string{field}, fields...)
-	group.path = func(ctx context.Context) (prev *sql.Selector, err error) {
+	grbuild := &ArtistGroupBy{config: aq.config}
+	grbuild.fields = append([]string{field}, fields...)
+	grbuild.path = func(ctx context.Context) (prev *sql.Selector, err error) {
 		if err := aq.prepareQuery(ctx); err != nil {
 			return nil, err
 		}
 		return aq.sqlQuery(ctx), nil
 	}
-	return group
+	grbuild.label = artist.Label
+	grbuild.flds, grbuild.scan = &grbuild.fields, grbuild.Scan
+	return grbuild
 }
 
 // Select allows the selection one or more fields/columns for the given query,
@@ -505,7 +507,10 @@ func (aq *ArtistQuery) GroupBy(field string, fields ...string) *ArtistGroupBy {
 //
 func (aq *ArtistQuery) Select(fields ...string) *ArtistSelect {
 	aq.fields = append(aq.fields, fields...)
-	return &ArtistSelect{ArtistQuery: aq}
+	selbuild := &ArtistSelect{ArtistQuery: aq}
+	selbuild.label = artist.Label
+	selbuild.flds, selbuild.scan = &aq.fields, selbuild.Scan
+	return selbuild
 }
 
 func (aq *ArtistQuery) prepareQuery(ctx context.Context) error {
@@ -524,7 +529,7 @@ func (aq *ArtistQuery) prepareQuery(ctx context.Context) error {
 	return nil
 }
 
-func (aq *ArtistQuery) sqlAll(ctx context.Context) ([]*Artist, error) {
+func (aq *ArtistQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Artist, error) {
 	var (
 		nodes       = []*Artist{}
 		withFKs     = aq.withFKs
@@ -545,17 +550,16 @@ func (aq *ArtistQuery) sqlAll(ctx context.Context) ([]*Artist, error) {
 		_spec.Node.Columns = append(_spec.Node.Columns, artist.ForeignKeys...)
 	}
 	_spec.ScanValues = func(columns []string) ([]interface{}, error) {
-		node := &Artist{config: aq.config}
-		nodes = append(nodes, node)
-		return node.scanValues(columns)
+		return (*Artist).scanValues(nil, columns)
 	}
 	_spec.Assign = func(columns []string, values []interface{}) error {
-		if len(nodes) == 0 {
-			return fmt.Errorf("ent: Assign called without calling ScanValues")
-		}
-		node := nodes[len(nodes)-1]
+		node := &Artist{config: aq.config}
+		nodes = append(nodes, node)
 		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
+	}
+	for i := range hooks {
+		hooks[i](ctx, _spec)
 	}
 	if err := sqlgraph.QueryNodes(ctx, aq.driver, _spec); err != nil {
 		return nil, err
@@ -623,261 +627,213 @@ func (aq *ArtistQuery) sqlAll(ctx context.Context) ([]*Artist, error) {
 	}
 
 	if query := aq.withDirected; query != nil {
-		fks := make([]driver.Value, 0, len(nodes))
-		ids := make(map[int]*Artist, len(nodes))
-		for _, node := range nodes {
-			ids[node.ID] = node
-			fks = append(fks, node.ID)
+		edgeids := make([]driver.Value, len(nodes))
+		byid := make(map[int]*Artist)
+		nids := make(map[int]map[*Artist]struct{})
+		for i, node := range nodes {
+			edgeids[i] = node.ID
+			byid[node.ID] = node
 			node.Edges.Directed = []*Movie{}
 		}
-		var (
-			edgeids []int
-			edges   = make(map[int][]*Artist)
-		)
-		_spec := &sqlgraph.EdgeQuerySpec{
-			Edge: &sqlgraph.EdgeSpec{
-				Inverse: true,
-				Table:   artist.DirectedTable,
-				Columns: artist.DirectedPrimaryKey,
-			},
-			Predicate: func(s *sql.Selector) {
-				s.Where(sql.InValues(artist.DirectedPrimaryKey[1], fks...))
-			},
-			ScanValues: func() [2]interface{} {
-				return [2]interface{}{new(sql.NullInt64), new(sql.NullInt64)}
-			},
-			Assign: func(out, in interface{}) error {
-				eout, ok := out.(*sql.NullInt64)
-				if !ok || eout == nil {
-					return fmt.Errorf("unexpected id value for edge-out")
+		query.Where(func(s *sql.Selector) {
+			joinT := sql.Table(artist.DirectedTable)
+			s.Join(joinT).On(s.C(movie.FieldID), joinT.C(artist.DirectedPrimaryKey[0]))
+			s.Where(sql.InValues(joinT.C(artist.DirectedPrimaryKey[1]), edgeids...))
+			columns := s.SelectedColumns()
+			s.Select(joinT.C(artist.DirectedPrimaryKey[1]))
+			s.AppendSelect(columns...)
+			s.SetDistinct(false)
+		})
+		neighbors, err := query.sqlAll(ctx, func(_ context.Context, spec *sqlgraph.QuerySpec) {
+			assign := spec.Assign
+			values := spec.ScanValues
+			spec.ScanValues = func(columns []string) ([]interface{}, error) {
+				values, err := values(columns[1:])
+				if err != nil {
+					return nil, err
 				}
-				ein, ok := in.(*sql.NullInt64)
-				if !ok || ein == nil {
-					return fmt.Errorf("unexpected id value for edge-in")
+				return append([]interface{}{new(sql.NullInt64)}, values...), nil
+			}
+			spec.Assign = func(columns []string, values []interface{}) error {
+				outValue := int(values[0].(*sql.NullInt64).Int64)
+				inValue := int(values[1].(*sql.NullInt64).Int64)
+				if nids[inValue] == nil {
+					nids[inValue] = map[*Artist]struct{}{byid[outValue]: struct{}{}}
+					return assign(columns[1:], values[1:])
 				}
-				outValue := int(eout.Int64)
-				inValue := int(ein.Int64)
-				node, ok := ids[outValue]
-				if !ok {
-					return fmt.Errorf("unexpected node id in edges: %v", outValue)
-				}
-				if _, ok := edges[inValue]; !ok {
-					edgeids = append(edgeids, inValue)
-				}
-				edges[inValue] = append(edges[inValue], node)
+				nids[inValue][byid[outValue]] = struct{}{}
 				return nil
-			},
-		}
-		if err := sqlgraph.QueryEdges(ctx, aq.driver, _spec); err != nil {
-			return nil, fmt.Errorf(`query edges "directed": %w`, err)
-		}
-		query.Where(movie.IDIn(edgeids...))
-		neighbors, err := query.All(ctx)
+			}
+		})
 		if err != nil {
 			return nil, err
 		}
 		for _, n := range neighbors {
-			nodes, ok := edges[n.ID]
+			nodes, ok := nids[n.ID]
 			if !ok {
 				return nil, fmt.Errorf(`unexpected "directed" node returned %v`, n.ID)
 			}
-			for i := range nodes {
-				nodes[i].Edges.Directed = append(nodes[i].Edges.Directed, n)
+			for kn := range nodes {
+				kn.Edges.Directed = append(kn.Edges.Directed, n)
 			}
 		}
 	}
 
 	if query := aq.withActed; query != nil {
-		fks := make([]driver.Value, 0, len(nodes))
-		ids := make(map[int]*Artist, len(nodes))
-		for _, node := range nodes {
-			ids[node.ID] = node
-			fks = append(fks, node.ID)
+		edgeids := make([]driver.Value, len(nodes))
+		byid := make(map[int]*Artist)
+		nids := make(map[int]map[*Artist]struct{})
+		for i, node := range nodes {
+			edgeids[i] = node.ID
+			byid[node.ID] = node
 			node.Edges.Acted = []*Movie{}
 		}
-		var (
-			edgeids []int
-			edges   = make(map[int][]*Artist)
-		)
-		_spec := &sqlgraph.EdgeQuerySpec{
-			Edge: &sqlgraph.EdgeSpec{
-				Inverse: true,
-				Table:   artist.ActedTable,
-				Columns: artist.ActedPrimaryKey,
-			},
-			Predicate: func(s *sql.Selector) {
-				s.Where(sql.InValues(artist.ActedPrimaryKey[1], fks...))
-			},
-			ScanValues: func() [2]interface{} {
-				return [2]interface{}{new(sql.NullInt64), new(sql.NullInt64)}
-			},
-			Assign: func(out, in interface{}) error {
-				eout, ok := out.(*sql.NullInt64)
-				if !ok || eout == nil {
-					return fmt.Errorf("unexpected id value for edge-out")
+		query.Where(func(s *sql.Selector) {
+			joinT := sql.Table(artist.ActedTable)
+			s.Join(joinT).On(s.C(movie.FieldID), joinT.C(artist.ActedPrimaryKey[0]))
+			s.Where(sql.InValues(joinT.C(artist.ActedPrimaryKey[1]), edgeids...))
+			columns := s.SelectedColumns()
+			s.Select(joinT.C(artist.ActedPrimaryKey[1]))
+			s.AppendSelect(columns...)
+			s.SetDistinct(false)
+		})
+		neighbors, err := query.sqlAll(ctx, func(_ context.Context, spec *sqlgraph.QuerySpec) {
+			assign := spec.Assign
+			values := spec.ScanValues
+			spec.ScanValues = func(columns []string) ([]interface{}, error) {
+				values, err := values(columns[1:])
+				if err != nil {
+					return nil, err
 				}
-				ein, ok := in.(*sql.NullInt64)
-				if !ok || ein == nil {
-					return fmt.Errorf("unexpected id value for edge-in")
+				return append([]interface{}{new(sql.NullInt64)}, values...), nil
+			}
+			spec.Assign = func(columns []string, values []interface{}) error {
+				outValue := int(values[0].(*sql.NullInt64).Int64)
+				inValue := int(values[1].(*sql.NullInt64).Int64)
+				if nids[inValue] == nil {
+					nids[inValue] = map[*Artist]struct{}{byid[outValue]: struct{}{}}
+					return assign(columns[1:], values[1:])
 				}
-				outValue := int(eout.Int64)
-				inValue := int(ein.Int64)
-				node, ok := ids[outValue]
-				if !ok {
-					return fmt.Errorf("unexpected node id in edges: %v", outValue)
-				}
-				if _, ok := edges[inValue]; !ok {
-					edgeids = append(edgeids, inValue)
-				}
-				edges[inValue] = append(edges[inValue], node)
+				nids[inValue][byid[outValue]] = struct{}{}
 				return nil
-			},
-		}
-		if err := sqlgraph.QueryEdges(ctx, aq.driver, _spec); err != nil {
-			return nil, fmt.Errorf(`query edges "acted": %w`, err)
-		}
-		query.Where(movie.IDIn(edgeids...))
-		neighbors, err := query.All(ctx)
+			}
+		})
 		if err != nil {
 			return nil, err
 		}
 		for _, n := range neighbors {
-			nodes, ok := edges[n.ID]
+			nodes, ok := nids[n.ID]
 			if !ok {
 				return nil, fmt.Errorf(`unexpected "acted" node returned %v`, n.ID)
 			}
-			for i := range nodes {
-				nodes[i].Edges.Acted = append(nodes[i].Edges.Acted, n)
+			for kn := range nodes {
+				kn.Edges.Acted = append(kn.Edges.Acted, n)
 			}
 		}
 	}
 
 	if query := aq.withWrote; query != nil {
-		fks := make([]driver.Value, 0, len(nodes))
-		ids := make(map[int]*Artist, len(nodes))
-		for _, node := range nodes {
-			ids[node.ID] = node
-			fks = append(fks, node.ID)
+		edgeids := make([]driver.Value, len(nodes))
+		byid := make(map[int]*Artist)
+		nids := make(map[int]map[*Artist]struct{})
+		for i, node := range nodes {
+			edgeids[i] = node.ID
+			byid[node.ID] = node
 			node.Edges.Wrote = []*Movie{}
 		}
-		var (
-			edgeids []int
-			edges   = make(map[int][]*Artist)
-		)
-		_spec := &sqlgraph.EdgeQuerySpec{
-			Edge: &sqlgraph.EdgeSpec{
-				Inverse: true,
-				Table:   artist.WroteTable,
-				Columns: artist.WrotePrimaryKey,
-			},
-			Predicate: func(s *sql.Selector) {
-				s.Where(sql.InValues(artist.WrotePrimaryKey[1], fks...))
-			},
-			ScanValues: func() [2]interface{} {
-				return [2]interface{}{new(sql.NullInt64), new(sql.NullInt64)}
-			},
-			Assign: func(out, in interface{}) error {
-				eout, ok := out.(*sql.NullInt64)
-				if !ok || eout == nil {
-					return fmt.Errorf("unexpected id value for edge-out")
+		query.Where(func(s *sql.Selector) {
+			joinT := sql.Table(artist.WroteTable)
+			s.Join(joinT).On(s.C(movie.FieldID), joinT.C(artist.WrotePrimaryKey[0]))
+			s.Where(sql.InValues(joinT.C(artist.WrotePrimaryKey[1]), edgeids...))
+			columns := s.SelectedColumns()
+			s.Select(joinT.C(artist.WrotePrimaryKey[1]))
+			s.AppendSelect(columns...)
+			s.SetDistinct(false)
+		})
+		neighbors, err := query.sqlAll(ctx, func(_ context.Context, spec *sqlgraph.QuerySpec) {
+			assign := spec.Assign
+			values := spec.ScanValues
+			spec.ScanValues = func(columns []string) ([]interface{}, error) {
+				values, err := values(columns[1:])
+				if err != nil {
+					return nil, err
 				}
-				ein, ok := in.(*sql.NullInt64)
-				if !ok || ein == nil {
-					return fmt.Errorf("unexpected id value for edge-in")
+				return append([]interface{}{new(sql.NullInt64)}, values...), nil
+			}
+			spec.Assign = func(columns []string, values []interface{}) error {
+				outValue := int(values[0].(*sql.NullInt64).Int64)
+				inValue := int(values[1].(*sql.NullInt64).Int64)
+				if nids[inValue] == nil {
+					nids[inValue] = map[*Artist]struct{}{byid[outValue]: struct{}{}}
+					return assign(columns[1:], values[1:])
 				}
-				outValue := int(eout.Int64)
-				inValue := int(ein.Int64)
-				node, ok := ids[outValue]
-				if !ok {
-					return fmt.Errorf("unexpected node id in edges: %v", outValue)
-				}
-				if _, ok := edges[inValue]; !ok {
-					edgeids = append(edgeids, inValue)
-				}
-				edges[inValue] = append(edges[inValue], node)
+				nids[inValue][byid[outValue]] = struct{}{}
 				return nil
-			},
-		}
-		if err := sqlgraph.QueryEdges(ctx, aq.driver, _spec); err != nil {
-			return nil, fmt.Errorf(`query edges "wrote": %w`, err)
-		}
-		query.Where(movie.IDIn(edgeids...))
-		neighbors, err := query.All(ctx)
+			}
+		})
 		if err != nil {
 			return nil, err
 		}
 		for _, n := range neighbors {
-			nodes, ok := edges[n.ID]
+			nodes, ok := nids[n.ID]
 			if !ok {
 				return nil, fmt.Errorf(`unexpected "wrote" node returned %v`, n.ID)
 			}
-			for i := range nodes {
-				nodes[i].Edges.Wrote = append(nodes[i].Edges.Wrote, n)
+			for kn := range nodes {
+				kn.Edges.Wrote = append(kn.Edges.Wrote, n)
 			}
 		}
 	}
 
 	if query := aq.withCountries; query != nil {
-		fks := make([]driver.Value, 0, len(nodes))
-		ids := make(map[int]*Artist, len(nodes))
-		for _, node := range nodes {
-			ids[node.ID] = node
-			fks = append(fks, node.ID)
+		edgeids := make([]driver.Value, len(nodes))
+		byid := make(map[int]*Artist)
+		nids := make(map[int]map[*Artist]struct{})
+		for i, node := range nodes {
+			edgeids[i] = node.ID
+			byid[node.ID] = node
 			node.Edges.Countries = []*Country{}
 		}
-		var (
-			edgeids []int
-			edges   = make(map[int][]*Artist)
-		)
-		_spec := &sqlgraph.EdgeQuerySpec{
-			Edge: &sqlgraph.EdgeSpec{
-				Inverse: true,
-				Table:   artist.CountriesTable,
-				Columns: artist.CountriesPrimaryKey,
-			},
-			Predicate: func(s *sql.Selector) {
-				s.Where(sql.InValues(artist.CountriesPrimaryKey[1], fks...))
-			},
-			ScanValues: func() [2]interface{} {
-				return [2]interface{}{new(sql.NullInt64), new(sql.NullInt64)}
-			},
-			Assign: func(out, in interface{}) error {
-				eout, ok := out.(*sql.NullInt64)
-				if !ok || eout == nil {
-					return fmt.Errorf("unexpected id value for edge-out")
+		query.Where(func(s *sql.Selector) {
+			joinT := sql.Table(artist.CountriesTable)
+			s.Join(joinT).On(s.C(country.FieldID), joinT.C(artist.CountriesPrimaryKey[0]))
+			s.Where(sql.InValues(joinT.C(artist.CountriesPrimaryKey[1]), edgeids...))
+			columns := s.SelectedColumns()
+			s.Select(joinT.C(artist.CountriesPrimaryKey[1]))
+			s.AppendSelect(columns...)
+			s.SetDistinct(false)
+		})
+		neighbors, err := query.sqlAll(ctx, func(_ context.Context, spec *sqlgraph.QuerySpec) {
+			assign := spec.Assign
+			values := spec.ScanValues
+			spec.ScanValues = func(columns []string) ([]interface{}, error) {
+				values, err := values(columns[1:])
+				if err != nil {
+					return nil, err
 				}
-				ein, ok := in.(*sql.NullInt64)
-				if !ok || ein == nil {
-					return fmt.Errorf("unexpected id value for edge-in")
+				return append([]interface{}{new(sql.NullInt64)}, values...), nil
+			}
+			spec.Assign = func(columns []string, values []interface{}) error {
+				outValue := int(values[0].(*sql.NullInt64).Int64)
+				inValue := int(values[1].(*sql.NullInt64).Int64)
+				if nids[inValue] == nil {
+					nids[inValue] = map[*Artist]struct{}{byid[outValue]: struct{}{}}
+					return assign(columns[1:], values[1:])
 				}
-				outValue := int(eout.Int64)
-				inValue := int(ein.Int64)
-				node, ok := ids[outValue]
-				if !ok {
-					return fmt.Errorf("unexpected node id in edges: %v", outValue)
-				}
-				if _, ok := edges[inValue]; !ok {
-					edgeids = append(edgeids, inValue)
-				}
-				edges[inValue] = append(edges[inValue], node)
+				nids[inValue][byid[outValue]] = struct{}{}
 				return nil
-			},
-		}
-		if err := sqlgraph.QueryEdges(ctx, aq.driver, _spec); err != nil {
-			return nil, fmt.Errorf(`query edges "countries": %w`, err)
-		}
-		query.Where(country.IDIn(edgeids...))
-		neighbors, err := query.All(ctx)
+			}
+		})
 		if err != nil {
 			return nil, err
 		}
 		for _, n := range neighbors {
-			nodes, ok := edges[n.ID]
+			nodes, ok := nids[n.ID]
 			if !ok {
 				return nil, fmt.Errorf(`unexpected "countries" node returned %v`, n.ID)
 			}
-			for i := range nodes {
-				nodes[i].Edges.Countries = append(nodes[i].Edges.Countries, n)
+			for kn := range nodes {
+				kn.Edges.Countries = append(kn.Edges.Countries, n)
 			}
 		}
 	}
@@ -985,6 +941,7 @@ func (aq *ArtistQuery) sqlQuery(ctx context.Context) *sql.Selector {
 // ArtistGroupBy is the group-by builder for Artist entities.
 type ArtistGroupBy struct {
 	config
+	selector
 	fields []string
 	fns    []AggregateFunc
 	// intermediate query (i.e. traversal path).
@@ -1006,209 +963,6 @@ func (agb *ArtistGroupBy) Scan(ctx context.Context, v interface{}) error {
 	}
 	agb.sql = query
 	return agb.sqlScan(ctx, v)
-}
-
-// ScanX is like Scan, but panics if an error occurs.
-func (agb *ArtistGroupBy) ScanX(ctx context.Context, v interface{}) {
-	if err := agb.Scan(ctx, v); err != nil {
-		panic(err)
-	}
-}
-
-// Strings returns list of strings from group-by.
-// It is only allowed when executing a group-by query with one field.
-func (agb *ArtistGroupBy) Strings(ctx context.Context) ([]string, error) {
-	if len(agb.fields) > 1 {
-		return nil, errors.New("ent: ArtistGroupBy.Strings is not achievable when grouping more than 1 field")
-	}
-	var v []string
-	if err := agb.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// StringsX is like Strings, but panics if an error occurs.
-func (agb *ArtistGroupBy) StringsX(ctx context.Context) []string {
-	v, err := agb.Strings(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// String returns a single string from a group-by query.
-// It is only allowed when executing a group-by query with one field.
-func (agb *ArtistGroupBy) String(ctx context.Context) (_ string, err error) {
-	var v []string
-	if v, err = agb.Strings(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{artist.Label}
-	default:
-		err = fmt.Errorf("ent: ArtistGroupBy.Strings returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// StringX is like String, but panics if an error occurs.
-func (agb *ArtistGroupBy) StringX(ctx context.Context) string {
-	v, err := agb.String(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Ints returns list of ints from group-by.
-// It is only allowed when executing a group-by query with one field.
-func (agb *ArtistGroupBy) Ints(ctx context.Context) ([]int, error) {
-	if len(agb.fields) > 1 {
-		return nil, errors.New("ent: ArtistGroupBy.Ints is not achievable when grouping more than 1 field")
-	}
-	var v []int
-	if err := agb.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// IntsX is like Ints, but panics if an error occurs.
-func (agb *ArtistGroupBy) IntsX(ctx context.Context) []int {
-	v, err := agb.Ints(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Int returns a single int from a group-by query.
-// It is only allowed when executing a group-by query with one field.
-func (agb *ArtistGroupBy) Int(ctx context.Context) (_ int, err error) {
-	var v []int
-	if v, err = agb.Ints(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{artist.Label}
-	default:
-		err = fmt.Errorf("ent: ArtistGroupBy.Ints returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// IntX is like Int, but panics if an error occurs.
-func (agb *ArtistGroupBy) IntX(ctx context.Context) int {
-	v, err := agb.Int(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Float64s returns list of float64s from group-by.
-// It is only allowed when executing a group-by query with one field.
-func (agb *ArtistGroupBy) Float64s(ctx context.Context) ([]float64, error) {
-	if len(agb.fields) > 1 {
-		return nil, errors.New("ent: ArtistGroupBy.Float64s is not achievable when grouping more than 1 field")
-	}
-	var v []float64
-	if err := agb.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// Float64sX is like Float64s, but panics if an error occurs.
-func (agb *ArtistGroupBy) Float64sX(ctx context.Context) []float64 {
-	v, err := agb.Float64s(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Float64 returns a single float64 from a group-by query.
-// It is only allowed when executing a group-by query with one field.
-func (agb *ArtistGroupBy) Float64(ctx context.Context) (_ float64, err error) {
-	var v []float64
-	if v, err = agb.Float64s(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{artist.Label}
-	default:
-		err = fmt.Errorf("ent: ArtistGroupBy.Float64s returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// Float64X is like Float64, but panics if an error occurs.
-func (agb *ArtistGroupBy) Float64X(ctx context.Context) float64 {
-	v, err := agb.Float64(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Bools returns list of bools from group-by.
-// It is only allowed when executing a group-by query with one field.
-func (agb *ArtistGroupBy) Bools(ctx context.Context) ([]bool, error) {
-	if len(agb.fields) > 1 {
-		return nil, errors.New("ent: ArtistGroupBy.Bools is not achievable when grouping more than 1 field")
-	}
-	var v []bool
-	if err := agb.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// BoolsX is like Bools, but panics if an error occurs.
-func (agb *ArtistGroupBy) BoolsX(ctx context.Context) []bool {
-	v, err := agb.Bools(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Bool returns a single bool from a group-by query.
-// It is only allowed when executing a group-by query with one field.
-func (agb *ArtistGroupBy) Bool(ctx context.Context) (_ bool, err error) {
-	var v []bool
-	if v, err = agb.Bools(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{artist.Label}
-	default:
-		err = fmt.Errorf("ent: ArtistGroupBy.Bools returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// BoolX is like Bool, but panics if an error occurs.
-func (agb *ArtistGroupBy) BoolX(ctx context.Context) bool {
-	v, err := agb.Bool(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
 }
 
 func (agb *ArtistGroupBy) sqlScan(ctx context.Context, v interface{}) error {
@@ -1252,6 +1006,7 @@ func (agb *ArtistGroupBy) sqlQuery() *sql.Selector {
 // ArtistSelect is the builder for selecting fields of Artist entities.
 type ArtistSelect struct {
 	*ArtistQuery
+	selector
 	// intermediate query (i.e. traversal path).
 	sql *sql.Selector
 }
@@ -1263,201 +1018,6 @@ func (as *ArtistSelect) Scan(ctx context.Context, v interface{}) error {
 	}
 	as.sql = as.ArtistQuery.sqlQuery(ctx)
 	return as.sqlScan(ctx, v)
-}
-
-// ScanX is like Scan, but panics if an error occurs.
-func (as *ArtistSelect) ScanX(ctx context.Context, v interface{}) {
-	if err := as.Scan(ctx, v); err != nil {
-		panic(err)
-	}
-}
-
-// Strings returns list of strings from a selector. It is only allowed when selecting one field.
-func (as *ArtistSelect) Strings(ctx context.Context) ([]string, error) {
-	if len(as.fields) > 1 {
-		return nil, errors.New("ent: ArtistSelect.Strings is not achievable when selecting more than 1 field")
-	}
-	var v []string
-	if err := as.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// StringsX is like Strings, but panics if an error occurs.
-func (as *ArtistSelect) StringsX(ctx context.Context) []string {
-	v, err := as.Strings(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// String returns a single string from a selector. It is only allowed when selecting one field.
-func (as *ArtistSelect) String(ctx context.Context) (_ string, err error) {
-	var v []string
-	if v, err = as.Strings(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{artist.Label}
-	default:
-		err = fmt.Errorf("ent: ArtistSelect.Strings returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// StringX is like String, but panics if an error occurs.
-func (as *ArtistSelect) StringX(ctx context.Context) string {
-	v, err := as.String(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Ints returns list of ints from a selector. It is only allowed when selecting one field.
-func (as *ArtistSelect) Ints(ctx context.Context) ([]int, error) {
-	if len(as.fields) > 1 {
-		return nil, errors.New("ent: ArtistSelect.Ints is not achievable when selecting more than 1 field")
-	}
-	var v []int
-	if err := as.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// IntsX is like Ints, but panics if an error occurs.
-func (as *ArtistSelect) IntsX(ctx context.Context) []int {
-	v, err := as.Ints(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Int returns a single int from a selector. It is only allowed when selecting one field.
-func (as *ArtistSelect) Int(ctx context.Context) (_ int, err error) {
-	var v []int
-	if v, err = as.Ints(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{artist.Label}
-	default:
-		err = fmt.Errorf("ent: ArtistSelect.Ints returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// IntX is like Int, but panics if an error occurs.
-func (as *ArtistSelect) IntX(ctx context.Context) int {
-	v, err := as.Int(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Float64s returns list of float64s from a selector. It is only allowed when selecting one field.
-func (as *ArtistSelect) Float64s(ctx context.Context) ([]float64, error) {
-	if len(as.fields) > 1 {
-		return nil, errors.New("ent: ArtistSelect.Float64s is not achievable when selecting more than 1 field")
-	}
-	var v []float64
-	if err := as.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// Float64sX is like Float64s, but panics if an error occurs.
-func (as *ArtistSelect) Float64sX(ctx context.Context) []float64 {
-	v, err := as.Float64s(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Float64 returns a single float64 from a selector. It is only allowed when selecting one field.
-func (as *ArtistSelect) Float64(ctx context.Context) (_ float64, err error) {
-	var v []float64
-	if v, err = as.Float64s(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{artist.Label}
-	default:
-		err = fmt.Errorf("ent: ArtistSelect.Float64s returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// Float64X is like Float64, but panics if an error occurs.
-func (as *ArtistSelect) Float64X(ctx context.Context) float64 {
-	v, err := as.Float64(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Bools returns list of bools from a selector. It is only allowed when selecting one field.
-func (as *ArtistSelect) Bools(ctx context.Context) ([]bool, error) {
-	if len(as.fields) > 1 {
-		return nil, errors.New("ent: ArtistSelect.Bools is not achievable when selecting more than 1 field")
-	}
-	var v []bool
-	if err := as.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// BoolsX is like Bools, but panics if an error occurs.
-func (as *ArtistSelect) BoolsX(ctx context.Context) []bool {
-	v, err := as.Bools(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Bool returns a single bool from a selector. It is only allowed when selecting one field.
-func (as *ArtistSelect) Bool(ctx context.Context) (_ bool, err error) {
-	var v []bool
-	if v, err = as.Bools(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{artist.Label}
-	default:
-		err = fmt.Errorf("ent: ArtistSelect.Bools returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// BoolX is like Bool, but panics if an error occurs.
-func (as *ArtistSelect) BoolX(ctx context.Context) bool {
-	v, err := as.Bool(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
 }
 
 func (as *ArtistSelect) sqlScan(ctx context.Context, v interface{}) error {

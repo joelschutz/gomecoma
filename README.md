@@ -1,4 +1,5 @@
 # GoMeCoMa
+*This project was abandoned because of dependency hell. Never trust other peoples code*
 Go Media Collection Manager borns from the combination of a wish and a need. I really
 wished that for a Movie Collection Manager that would be clean, open source and integration
 friendly. Many of the options where old, bad maintained(not that this project is different),
